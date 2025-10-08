@@ -157,28 +157,53 @@ get_user_input() {
     yad)
       FORM_OUTPUT=$(yad --form \
         --title="Gutenberg Downloader" \
-        --width=400 \
+        --width=800 \
         --height=200 \
         --center \
         --window-icon="book" \
-        --field="📘 Buch-URL zur Projekt Gutenberg-Seite": \
-        --field="📄 PDF-Dateiname (ohne .pdf)": \
-        --field="📁 Zielordner auswählen":DIR \
-        "" "" "$HOME")
+        --field="📘 Buch-URL zur Projekt Gutenberg-Seite (e.g. https://www.projekt-gutenberg.org/twain/querkopf/index.html)":LBL \
+        --field="📘 Enter book URL": \
+        --field="📄 PDF filename (without .pdf)": \
+        --field="📁 Choose output folder":DIR \
+        "" "" "" "$HOME")
       [ $? -ne 0 ] && echo "🚫 Abgebrochen." && exit 1
       IFS="|" read -r URL OUTPUT TARGET_DIR <<< "$FORM_OUTPUT"
       ;;
     zenity)
-      URL=$(zenity --entry --title="Gutenberg URL" --text="Enter book URL:")
-      OUTPUT=$(zenity --entry --title="Filename" --text="Enter PDF filename:")
+      URL=$(zenity --entry \
+        --title="Gutenberg URL" \
+        --text="Enter book URL (e.g. https://www.projekt-gutenberg.org/twain/querkopf/index.html):")
+      [ $? -ne 0 ] && echo "🚫 Abgebrochen." && exit 1
+      OUTPUT=$(zenity --entry --title="Filename" --text="Enter PDF filename (without .pdf):")
+      [ $? -ne 0 ] && echo "🚫 Abgebrochen." && exit 1
       TARGET_DIR=$(zenity --file-selection --directory --title="Choose output folder")
+      [ $? -ne 0 ] && echo "🚫 Abgebrochen." && exit 1
       ;;
     dialog)
-      URL=$(dialog --inputbox "Enter book URL:" 10 60 3>&1 1>&2 2>&3)
-      OUTPUT=$(dialog --inputbox "Enter PDF filename:" 10 60 3>&1 1>&2 2>&3)
-      TARGET_DIR=$(dialog --dselect "$HOME/" 10 60 3>&1 1>&2 2>&3)
+        dialog --inputbox "Enter book URL (e.g. https://www.projekt-gutenberg.org/twain/querkopf/index.html):" 10 70 3>&1 1>&2 2>&3
+        DIALOG_EXIT=$?
+        if [ "$DIALOG_EXIT" -ne 0 ]; then
+          echo "🚫 Abgebrochen." && exit 1
+        fi
+        URL=$(dialog --inputbox "Enter book URL (e.g. https://www.projekt-gutenberg.org/twain/querkopf/index.html):" 10 70 3>&1 1>&2 2>&3)
+
+        dialog --inputbox "Enter PDF filename (without .pdf):" 10 60 3>&1 1>&2 2>&3
+        DIALOG_EXIT=$?
+        if [ "$DIALOG_EXIT" -ne 0 ]; then
+          echo "🚫 Abgebrochen." && exit 1
+        fi
+        OUTPUT=$(dialog --inputbox "Enter PDF filename (without .pdf):" 10 60 3>&1 1>&2 2>&3)
+
+        dialog --dselect "$HOME/" 10 60 3>&1 1>&2 2>&3
+        DIALOG_EXIT=$?
+        if [ "$DIALOG_EXIT" -ne 0 ]; then
+          echo "🚫 Abgebrochen." && exit 1
+        fi
+        TARGET_DIR=$(dialog --dselect "$HOME/" 10 60 3>&1 1>&2 2>&3)
       ;;
     *)
+      echo "📘 Please enter the book URL in the format:"
+      echo "    https://www.projekt-gutenberg.org/twain/querkopf/index.html"
       read -p "🔗 Book URL: " URL
       read -p "📄 Filename (without .pdf): " OUTPUT
       read -p "📁 Output folder: " TARGET_DIR
