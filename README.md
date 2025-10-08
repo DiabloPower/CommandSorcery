@@ -26,6 +26,15 @@ To view all available options and usage instructions, simply run:
 ./gutenberg.sh --help
 ```
 
+🧰 Core Dependencies
+
+These tools are essential for the script to function properly. If missing, they will be automatically installed via apt (with sudo):
+
+- wget – for downloading web pages and files
+- pandoc – for converting text formats (e.g., Markdown to PDF)
+- lynx – for parsing and extracting text from HTML
+- pdflatex – for generating PDFs via LaTeX (used by Pandoc)
+
 ---
 to be continued...
 
