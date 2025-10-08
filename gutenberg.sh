@@ -58,6 +58,9 @@ if $SHOW_HELP; then
   echo "Beispiel:"
   echo "  ./gutenberg.sh --yad --no-toc --no-open"
   echo ""
+  echo "Linkformat zum Buch, Beispiel an Mark Twains Querkopf Wilson:"
+  echo "  https://www.projekt-gutenberg.org/twain/querkopf/index.html"
+  echo ""
   exit 0
 fi
 
