@@ -167,7 +167,7 @@ get_user_input() {
         --field="📁 Choose output folder":DIR \
         "" "" "" "$HOME")
       [ $? -ne 0 ] && echo "🚫 Abgebrochen." && exit 1
-      IFS="|" read -r URL OUTPUT TARGET_DIR <<< "$FORM_OUTPUT"
+      IFS="|" read -r _ URL OUTPUT TARGET_DIR <<< "$FORM_OUTPUT"
       ;;
     zenity)
       URL=$(zenity --entry \
