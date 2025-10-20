@@ -53,7 +53,7 @@ Available options:
 
 ## [`ffmpeg-convert-mkv.sh`](./ffmpeg-convert-mkv.sh):
 
-A versatile shell script for converting MKV video files using FFmpeg, with support for hardware acceleration (NVENC) and multiple user interfaces.
+A flexible shell script for converting video files with FFmpeg, supporting hardware acceleration (NVENC) and multiple user interfaces. It accepts virtually any input format (e.g. AVI, MP4, MOV) and re-encodes the video using H.265 — either via libx265 or NVENC if available — while converting audio to AAC. The output container is determined by the file extension you specify, such as .mkv, .mp4, or others.
 
 🎛️ Interface Options:
 
