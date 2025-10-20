@@ -3,7 +3,7 @@ A growing arsenal of command-line spells — crafted for automation, diagnostics
 
 ## Scripts
 
-### gutenberg.sh: 
+### [`gutenberg.sh`](./gutenberg.sh): 
 
 A shell script for fetching, organizing, and exporting books from [Projekt Gutenberg-DE](https://www.projekt-gutenberg.org/) as polished PDFs.
 
@@ -34,6 +34,67 @@ These tools are essential for the script to function properly. If missing, they 
 - pandoc – for converting text formats (e.g., Markdown to PDF)
 - lynx – for parsing and extracting text from HTML
 - pdflatex – for generating PDFs via LaTeX (used by Pandoc)
+
+🧩 Optional GUI Dependencies
+
+These are only installed if explicitly requested via:
+
+```bash
+--install-if-missing=yad
+```
+
+Available options:
+
+- yad – graphical form and live log window
+- zenity – entry dialogs and progress spinner
+- dialog – text-based UI for terminal environments
+
+---
+
+## [`ffmpeg-convert-mkv.sh`](./ffmpeg-convert-mkv.sh):
+
+A versatile shell script for converting MKV video files using FFmpeg, with support for hardware acceleration (NVENC) and multiple user interfaces.
+
+🎛️ Interface Options:
+
+This script supports multiple user interfaces:
+
+- 🖥️ CLI (Command Line)
+- 🪟 Dialog
+- 🪄 Zenity
+- 🧿 YAD
+
+The interface can be selected manually via command-line flags, or defaults to YAD if available.
+
+🧾 Usage:
+
+To view all available options and usage instructions, simply run:
+
+```bash
+./ffmpeg-convert-mkv.sh --help
+```
+
+🧰 Core Dependencies
+
+ffmpeg – required for video conversion (automatically installed via apt if missing)
+
+🧩 Optional GUI Dependencies
+
+These are only installed if explicitly requested via:
+
+```bash
+--install-if-missing=yad
+```
+
+Available options:
+
+- yad – graphical form and live log window
+- zenity – entry dialogs and progress spinner
+- dialog – text-based UI for terminal environments
+
+⚡ Hardware Acceleration
+
+If NVIDIA NVENC is available, the script will use hevc_nvenc for faster encoding. Otherwise, it falls back to libx265.
 
 ---
 to be continued...
