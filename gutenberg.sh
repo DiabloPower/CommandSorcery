@@ -26,8 +26,11 @@ SHOW_HELP=false
 NO_OPEN=false
 DISABLE_TOC=false
 
+
+INSTALL_GUI_TOOL=""
 for arg in "$@"; do
   case "$arg" in
+    --install-if-missing=*) INSTALL_GUI_TOOL="${arg#*=}" ;;
     --dialog) GUI_OVERRIDE="dialog" ;;
     --zenity) GUI_OVERRIDE="zenity" ;;
     --yad)    GUI_OVERRIDE="yad" ;;
@@ -44,16 +47,18 @@ if $SHOW_HELP; then
   echo "----------------------------------------"
   echo "Verwendung: ./gutenberg.sh [OPTIONEN]"
   echo ""
+  echo "  --install-if-missing=UI	Intalliert UI-Tools (yad/zenity/dialog)"
+  echo ""
   echo "GUI-Modus:"
-  echo "  --yad       Nutze YAD als grafische Oberfläche"
-  echo "  --zenity    Nutze Zenity als grafische Oberfläche"
-  echo "  --dialog    Nutze Dialog (Text-basiert im Terminal)"
-  echo "  --cli       Nutze reine Kommandozeile ohne GUI"
+  echo "  --yad       			Nutze YAD als grafische Oberfläche"
+  echo "  --zenity    			Nutze Zenity als grafische Oberfläche"
+  echo "  --dialog    			Nutze Dialog (Text-basiert im Terminal)"
+  echo "  --cli       			Nutze reine Kommandozeile ohne GUI"
   echo ""
   echo "Funktionale Optionen:"
-  echo "  --no-toc    Erzeuge Inhaltsverzeichnis im PDF nicht"
-  echo "  --no-open   Öffne die PDF nach dem Erstellen nicht automatisch"
-  echo "  --help, -h  Zeigt diese Hilfe"
+  echo "  --no-toc    			Erzeuge Inhaltsverzeichnis im PDF nicht"
+  echo "  --no-open   			Öffne die PDF nach dem Erstellen nicht automatisch"
+  echo "  --help, -h  			Zeigt diese Hilfe"
   echo ""
   echo "Beispiel:"
   echo "  ./gutenberg.sh --yad --no-toc --no-open"
@@ -117,7 +122,7 @@ check_gui_tool() {
   return 0
 }
 
-# Detect available GUI tool (zenity or dialog)
+# Detect available GUI tool (yad, zenity or dialog)
 detect_gui_tool() {
   if [ -n "$GUI_OVERRIDE" ]; then
     GUI_TOOL="$GUI_OVERRIDE"
@@ -420,8 +425,23 @@ cleanup() {
   echo "✅ Done! PDF saved as: ${TARGET_DIR}/${OUTPUT}.pdf"
   
   # 🧭 Optionally do not open the PDF after generation
-  if ! $NO_OPEN; then
-    xdg-open "${TARGET_DIR}/${OUTPUT}.pdf" &
+  if [[ "$GUI_TOOL" == "yad" ]]; then
+    yad --info \
+      --title="✅ Fertig!" \
+      --text="Das PDF wurde erfolgreich erstellt:\n\n${TARGET_DIR}/${OUTPUT}.pdf" \
+      --button="Öffnen:0" \
+      --button="Schließen:1" \
+      --width=400 \
+      --height=120
+
+    if [ $? -eq 0 ] && ! $NO_OPEN; then
+      xdg-open "${TARGET_DIR}/${OUTPUT}.pdf" &
+    fi
+  else
+    echo "✅ PDF erstellt: ${TARGET_DIR}/${OUTPUT}.pdf"
+    if ! $NO_OPEN; then
+      xdg-open "${TARGET_DIR}/${OUTPUT}.pdf" &
+    fi
   fi
 }
 
@@ -436,6 +456,24 @@ if ! check_core_tools; then
   install_missing_core
 fi
 
+# install missing UI-Tools (optional)
+case "$INSTALL_GUI_TOOL" in
+  yad|zenity|dialog)
+    if ! command -v "$INSTALL_GUI_TOOL" &>/dev/null; then
+      echo "📦 Installiere GUI-Tool: $INSTALL_GUI_TOOL"
+      sudo apt update && sudo apt install -y "$INSTALL_GUI_TOOL"
+    else
+      echo "✅ GUI-Tool '$INSTALL_GUI_TOOL' ist bereits installiert."
+    fi
+    ;;
+  "")
+    # do nothing
+    ;;
+  *)
+    echo "⚠️ Unbekanntes GUI-Tool: '$INSTALL_GUI_TOOL'"
+    ;;
+esac
+
 detect_gui_tool
 echo "🖥️ Eingabemodus: $GUI_TOOL"
 check_gui_tool || {
@@ -443,5 +481,25 @@ check_gui_tool || {
   exit 1
 }
 get_user_input
+# ourput cli to UI if yad is used
+if [[ "$GUI_TOOL" == "yad" ]]; then
+  LOGFILE=$(mktemp)
+  tail -f "$LOGFILE" | yad --text-info \
+    --title="📘 Verarbeitung läuft…" \
+    --width=800 \
+    --height=400 \
+    --center \
+    --wrap \
+    --tail \
+    --no-buttons &
+  TAIL_PID=$!
+  exec 3>&1 1>>"$LOGFILE" 2>&1
+fi
 download_and_convert
+# cleanup if yad is used as UI
+if [[ "$GUI_TOOL" == "yad" ]]; then
+  exec 1>&3 3>&-
+  kill "$TAIL_PID"
+  rm "$LOGFILE"
+fi
 cleanup
