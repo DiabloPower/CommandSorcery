@@ -368,3 +368,15 @@ select_audio_opts() {
     echo "-c:a aac -b:a 192k"
   fi
 }
+
+select_nvenc_ratecontrol() {
+  local is_maxwell="$1"
+  local quality="$2"
+  local bitrate="$3"
+
+  if $is_maxwell; then
+    echo "-rc:v constqp -qp $quality"
+  else
+    echo "-rc:v vbr_hq -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M"
+  fi
+}
