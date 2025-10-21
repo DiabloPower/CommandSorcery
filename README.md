@@ -1,7 +1,30 @@
-# CommandSorcery
-A growing arsenal of command-line spells — crafted for automation, diagnostics, and everyday CLI enchantments. Bash-centric and more.
+# 🧙‍♂️ CommandSorcery
+A growing arsenal of command-line spells — crafted for automation, diagnostics, and everyday CLI enchantments. CommandSorcery is a modular Bash launcher ([sorcery.sh](./sorcery.sh)) that orchestrates remote scripts with full GUI and CLI support. It acts as a central gateway to your toolset: self-updating, interface-flexible, and extensible via registry.
 
-## Scripts
+## 🚀 Launcher: [sorcery.sh](./sorcery.sh)
+The heart of the system. This script lets you select and execute any registered tool — either interactively via GUI or directly via command-line.
+
+### ✨ Features
+- 🧠 Auto-detects best available UI (YAD, Zenity, Dialog, CLI)
+- 🪄 GUI-based script selection if no arguments are passed
+- 🔄 Self-updating via GitHub (--update-self)
+- 🛡️ Safe update logic with backup and HTTP check
+- 🧾 Help overview via --help
+- 🧰 Registry-based architecture for easy extensibility
+
+### 🧾 Usage
+```bash
+./sorcery.sh [SCRIPT] [OPTIONS]
+```
+Examples
+```bash
+./sorcery.sh gutenberg --yad --no-open
+./sorcery.sh convert --batch --cli
+./sorcery.sh --update-self
+```
+If no script is specified, a GUI menu will appear (based on available interface tools).
+
+## 📜 Registered Scripts
 
 ### [`gutenberg.sh`](./gutenberg.sh): 
 
@@ -118,37 +141,26 @@ to be continued...
 This project was developed and tested on a Debian-based system (Zorin OS 17.3). The scripts attempt to install their required dependencies automatically via apt, if missing.
 
 ## 🧠 Remote Execution from GitHub
-You can run these scripts directly from GitHub without downloading them manually. This is useful for quick usage, automation, or testing across multiple systems.
+You can run these scripts directly from GitHub using curl or wget without downloading them manually. This is useful for quick usage, automation, or testing across multiple systems.
 
-### 🧾 Example: Run gutenberg.sh directly
+### 🧾 Example: Run sorcery.sh directly
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/gutenberg.sh)
-```
-Or using wget:
-```bash
-bash <(wget -qO - https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/gutenberg.sh)
-```
-### 🎬 Example: Run ffmpeg-convert-mkv.sh directly
-```bash
-bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh)
-```
-Or using wget:
-```bash
-bash <(wget -qO - https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh)
+bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/sorcery.sh)
+bash <(wget -qO - https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/sorcery.sh)
 ```
 You can pass any flags as usual, for example:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh) --batch --yad
+bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/sorcery.sh) convert --batch --yad
 ```
 
-⚠️ Note: This requires internet access and assumes the script is compatible with your system. Dependencies will be installed automatically if missing (via apt).
+⚠️ Note: This requires internet access and assumes the script is compatible with your system. Core Dependencies will be installed automatically if missing (via apt).
 
 ## 📜 License
 
 ```plaintext
 # 
-# Copyright (c) 2024 Ronny Hamann
+# Copyright (c) 2025 Ronny Hamann
 # 
 # License Terms:
 # 
@@ -166,8 +178,8 @@ bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main
 #
 ```
 
-## Contributing
-Feel free to open issues or submit pull requests if you want to contribute to the project.
+## 🤝 Contributing
+Feel free to open issues or submit pull requests.
 
-## Contact
+## 📬 Contact
 For any questions or feedback, please contact Ronny Hamann.
