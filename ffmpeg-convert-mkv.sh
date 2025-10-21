@@ -17,26 +17,31 @@
 # script or the use or other dealings in the script.
 #
 # ┌────────────────────────────────────────────────────────────┐
-# │ 🎥 FFmpeg MKV Conversion Script with GUI and CLI Support   │
-# │ Supports YAD, Zenity, Dialog, and pure CLI                 │
+# │ 🎥 FFmpeg Conversion Script with GUI and CLI Support       │
+# │ Supports YAD, Zenity, Dialog, CLI, and Batch Mode          │
 # └────────────────────────────────────────────────────────────┘
 
+# Default UI mode
 UI="yad"
+INSTALL_GUI_TOOL=""
+BATCH_MODE=false
 
+# Show help message and usage instructions
 show_help() {
   echo "Usage: $0 [OPTIONS]"
   echo ""
   echo "Options:"
-  echo "  --install-if-missing=UI	Use to install UI-Tools (YAD/Zenity/Dialog)"
-  echo "  --yad			        Use YAD GUI (default if available)"
-  echo "  --zenity    			Use Zenity GUI"
-  echo "  --dialog    			Use Dialog (text-based UI)"
-  echo "  --cli       			Use pure command-line input"
-  echo "  --help      			Show this help message"
+  echo "  --install-if-missing=UI   Install UI tool (yad/zenity/dialog)"
+  echo "  --yad                     Use YAD GUI (default if available)"
+  echo "  --zenity                  Use Zenity GUI"
+  echo "  --dialog                  Use Dialog (text-based UI)"
+  echo "  --cli                     Use pure command-line input"
+  echo "  --batch                   Enable batch mode for directory conversion"
+  echo "  --help                    Show this help message"
   exit 0
 }
 
-INSTALL_GUI_TOOL=""
+# Parse command-line arguments
 for arg in "$@"; do
   case "$arg" in
     --install-if-missing=*) INSTALL_GUI_TOOL="${arg#*=}" ;;
@@ -44,11 +49,13 @@ for arg in "$@"; do
     --zenity) UI="zenity" ;;
     --dialog) UI="dialog" ;;
     --cli) UI="cli" ;;
+    --batch) BATCH_MODE=true ;;
     --help) show_help ;;
     *) echo "Unknown option: $arg"; show_help ;;
   esac
 done
 
+# Install required tool if missing
 install_if_missing() {
   if ! command -v "$1" &> /dev/null; then
     echo "$1 not found. Installing..."
@@ -56,25 +63,19 @@ install_if_missing() {
   fi
 }
 
-install_if_missing ffmpeg  # hard dependency
+# Ensure ffmpeg is installed
+install_if_missing ffmpeg
 
+# Optionally install selected GUI tool
 case "$INSTALL_GUI_TOOL" in
   yad|zenity|dialog)
-    if ! command -v "$INSTALL_GUI_TOOL" &>/dev/null; then
-      echo "📦 Installiere GUI-Tool: $INSTALL_GUI_TOOL"
-      sudo apt update && sudo apt install -y "$INSTALL_GUI_TOOL"
-    else
-      echo "✅ GUI-Tool '$INSTALL_GUI_TOOL' already installed."
-    fi
+    install_if_missing "$INSTALL_GUI_TOOL"
     ;;
-  "")
-    # do nothing
-    ;;
-  *)
-    echo "⚠️ Unknown GUI-Tool: $INSTALL_GUI_TOOL"
-    ;;
+  "") ;;
+  *) echo "⚠️ Unknown GUI-Tool: $INSTALL_GUI_TOOL" ;;
 esac
 
+# Check for NVIDIA NVENC support
 if [[ -f "/usr/lib/x86_64-linux-gnu/libnvidia-encode.so.1" ]]; then
   echo "✅ NVIDIA encoding libraries found."
 else
@@ -82,6 +83,7 @@ else
   exit 1
 fi
 
+# Select encoder: NVENC if available, otherwise fallback to CPU
 if ffmpeg -encoders | grep -q hevc_nvenc; then
   ENCODER="hevc_nvenc"
 else
@@ -89,6 +91,7 @@ else
   ENCODER="libx265"
 fi
 
+# Fallback to CLI if selected UI tool is not available
 check_ui() {
   if ! command -v "$1" &> /dev/null; then
     echo "$1 not available. Falling back to CLI."
@@ -97,91 +100,234 @@ check_ui() {
 }
 check_ui "$UI"
 
+# Prompt user to select input/output directories for batch mode
+get_batch_input() {
+  case "$UI" in
+    yad)
+      DIRS=$(yad --form \
+        --title="🎬 Batch Conversion" \
+        --width=800 \
+        --height=200 \
+        --center \
+        --field="📁 Input directory":DIR \
+        --field="💾 Output directory":DIR \
+        "$HOME" "$HOME")
+      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      IFS="|" read -r INPUT_DIR OUTPUT_DIR <<< "$DIRS"
+      ;;
+    zenity)
+      INPUT_DIR=$(zenity --file-selection --directory --title="Select input directory")
+      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      OUTPUT_DIR=$(zenity --file-selection --directory --title="Select output directory")
+      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      ;;
+    dialog)
+      INPUT_DIR=$(dialog --title "Input directory" --dselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
+      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      OUTPUT_DIR=$(dialog --title "Output directory" --dselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
+      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      ;;
+    cli)
+      read -e -p "📁 Input directory: " INPUT_DIR
+      read -e -p "💾 Output directory: " OUTPUT_DIR
+      ;;
+  esac
+
+  # Create output directory if it doesn't exist
+  if [[ ! -d "$OUTPUT_DIR" ]]; then
+    echo "📂 Creating output directory: $OUTPUT_DIR"
+    mkdir -p "$OUTPUT_DIR" || { echo "❌ Failed to create output directory."; exit 1; }
+  fi
+}
+
+# Perform batch conversion of all supported video files in input directory
+run_batch_conversion() {
+  echo "📦 Starting batch conversion..."
+  shopt -s nullglob
+  LOGFILE=$(mktemp)
+  SUMMARY_LOG=$(mktemp)
+  PIPE=$(mktemp -u)
+  mkfifo "$PIPE"
+
+  SUCCESS_COUNT=0
+  FAIL_COUNT=0
+  SKIPPED_COUNT=0
+
+  # Backup original stdout/stderr
+  exec {STDOUT_BACKUP}>&1
+  exec {STDERR_BACKUP}>&2
+
+  # Start YAD live log window
+  if [[ "$UI" == "yad" ]]; then
+    yad --text-info \
+      --title="🎬 Batch Converting..." \
+      --width=800 \
+      --height=400 \
+      --center \
+      --wrap \
+      --tail \
+      --no-buttons < "$PIPE" &
+    YAD_PID=$!
+  fi
+
+  # Redirect stdout/stderr to logfile and pipe
+  exec > >(tee -a "$LOGFILE" > "$PIPE")
+  exec 2>&1
+
+  # Conversion loop
+  for INPUT_FILE in "$INPUT_DIR"/*.{mp4,mkv,avi,mov,flv,webm,mpeg,mpg,m4v,ts,wmv,ogg}; do
+    [ -f "$INPUT_FILE" ] || continue
+    BASENAME=$(basename "$INPUT_FILE")
+    OUTPUT_FILE="${OUTPUT_DIR}/${BASENAME%.*}.mkv"
+
+    if [[ "$(realpath "$INPUT_FILE")" == "$(realpath "$OUTPUT_FILE")" ]]; then
+      echo "⚠️ Skipping $BASENAME — input and output paths are identical." | tee -a "$SUMMARY_LOG"
+      ((SKIPPED_COUNT++))
+      continue
+    fi
+
+    echo "🎬 Converting: $BASENAME → $(basename "$OUTPUT_FILE")"
+    if ffmpeg -y -i "$INPUT_FILE" -c:v "$ENCODER" -preset medium \
+      -b:v "${BITRATE}M" -qp "$QUALITY" -map 0:v -map 0:a \
+      -c:a aac -b:a 192k "$OUTPUT_FILE"; then
+      echo "✅ Success: $BASENAME" | tee -a "$SUMMARY_LOG"
+      ((SUCCESS_COUNT++))
+    else
+      echo "❌ Failed: $BASENAME" | tee -a "$SUMMARY_LOG"
+      ((FAIL_COUNT++))
+    fi
+  done
+
+  echo "✅ Batch conversion complete!"
+
+  # Restore original stdout/stderr
+  exec 1>&${STDOUT_BACKUP}
+  exec 2>&${STDERR_BACKUP}
+
+  # Clean up GUI
+  if [[ "$UI" == "yad" ]]; then
+    sleep 1
+    kill "$YAD_PID"
+    rm "$PIPE"
+    yad --info \
+      --title="✅ Batch Complete" \
+      --text="All files have been successfully converted!" \
+      --button="OK:0" \
+      --width=400 \
+      --height=100
+  else
+    cat "$LOGFILE"
+    rm "$LOGFILE"
+  fi
+
+  # Final summary
+  echo -e "\n📊 Summary:"
+  echo "  ✔️ Successful: $SUCCESS_COUNT"
+  echo "  ❌ Failed:     $FAIL_COUNT"
+  echo "  ⚠️ Skipped:    $SKIPPED_COUNT"
+  echo -e "\n📝 Detailed summary:"
+  cat "$SUMMARY_LOG"
+  rm "$SUMMARY_LOG"
+}
+
+# Prompt user for input/output files and encoding parameters
 get_user_input() {
   case "$UI" in
     yad)
-      INPUT_FILE=$(yad --file --title="🎬 Select input MKV file" --width=900 --height=600)
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      OUTPUT_FILE=$(yad --file --save --title="💾 Choose output MKV file" --width=900 --height=600)
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      if ! $BATCH_MODE; then
+        INPUT_FILE=$(yad --file --title="🎬 Select input file" --width=900 --height=600)
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+        OUTPUT_FILE=$(yad --file --save --title="💾 Choose output file" --width=900 --height=600)
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      fi
       BITRATE="2"
-      QUALITY="26"
+      QUALITY="22"
       FORM_OUTPUT=$(yad --form \
         --title="🎥 MKV Converter" \
         --width=900 \
         --height=200 \
         --center \
         --window-icon="video-x-generic" \
-        --field="🎬 Input file":TXT \
-        --field="💾 Output file (.mkv)":TXT \
         --field="📶 Bitrate (Mbit/s)":NUM \
         --field="🎚️ Quality (CRF or QP)":NUM \
-        "$INPUT_FILE" "$OUTPUT_FILE" "$BITRATE" "$QUALITY")
+        "$BITRATE" "$QUALITY")
       [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      IFS="|" read -r INPUT_FILE OUTPUT_FILE BITRATE QUALITY <<< "$FORM_OUTPUT"
-
-      OVERWRITE_FLAG=""
-      if [[ -f "$OUTPUT_FILE" ]]; then
-        yad --question \
-          --title="⚠️ File exists" \
-          --text="The output file already exists:\n\n$OUTPUT_FILE\n\nDo you want to overwrite it?" \
-          --button="Overwrite:0" \
-          --button="Cancel:1"
-        if [ $? -eq 0 ]; then
-          OVERWRITE_FLAG="-y"
-        else
-          echo "🚫 Cancelled by user." && exit 1
-        fi
-      fi
+      IFS="|" read -r BITRATE QUALITY <<< "$FORM_OUTPUT"
       ;;
     zenity)
-      INPUT_FILE=$(zenity --file-selection --title="Select input MKV file")
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      OUTPUT_FILE=$(zenity --file-selection --save --title="Choose output file")
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      if ! $BATCH_MODE; then
+        INPUT_FILE=$(zenity --file-selection --title="Select input file")
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+        OUTPUT_FILE=$(zenity --file-selection --save --title="Choose output file")
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      fi
       BITRATE=$(zenity --entry --title="Bitrate" --text="Enter bitrate in Mbit/s (e.g. 2):" --entry-text="2")
       [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      QUALITY=$(zenity --entry --title="Quality" --text="Enter CRF or QP value (e.g. 26):" --entry-text="26")
+      QUALITY=$(zenity --entry --title="Quality" --text="Enter CRF or QP value (e.g. 22):" --entry-text="22")
       [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      OVERWRITE_FLAG="-y"
       ;;
     dialog)
-      INPUT_FILE=$(dialog --title "Input file" --fselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      OUTPUT_FILE=$(dialog --title "Output file" --fselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      # Use dialog to select input/output files and enter encoding parameters
+      if ! $BATCH_MODE; then
+        INPUT_FILE=$(dialog --title "Input file" --fselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+        OUTPUT_FILE=$(dialog --title "Output file" --fselect "$HOME/" 15 80 3>&1 1>&2 2>&3)
+        [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
+      fi
       BITRATE=$(dialog --inputbox "Enter bitrate in Mbit/s (e.g. 2):" 10 50 "2" 3>&1 1>&2 2>&3)
       [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      QUALITY=$(dialog --inputbox "Enter CRF or QP value (e.g. 26):" 10 50 "26" 3>&1 1>&2 2>&3)
+      QUALITY=$(dialog --inputbox "Enter CRF or QP value (e.g. 22):" 10 50 "22" 3>&1 1>&2 2>&3)
       [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      OVERWRITE_FLAG="-y"
       ;;
     cli)
-      echo "📥 Please enter conversion parameters:"
-      read -rp "🎬 Input file path: " INPUT_FILE
-      read -rp "💾 Output file path: " OUTPUT_FILE
+      # Use CLI to enter input/output paths and encoding parameters
+      if ! $BATCH_MODE; then
+        read -e -p "🎬 Input file path: " INPUT_FILE
+        read -e -p "💾 Output file path: " OUTPUT_FILE
+      fi
       read -rp "📶 Bitrate in Mbit/s (e.g. 2): " BITRATE
-      read -rp "🎚️ Quality (CRF or QP, e.g. 26): " QUALITY
-      OVERWRITE_FLAG="-y"
+      read -rp "🎚️ Quality (CRF or QP, e.g. 22): " QUALITY
       ;;
   esac
 }
 
+# If batch mode is enabled, run batch input and conversion, then exit
+if $BATCH_MODE; then
+  get_user_input         # Ask for bitrate and quality
+  get_batch_input        # Ask for input/output directories
+  run_batch_conversion   # Process all files in batch
+  exit 0
+fi
+
+# Otherwise, proceed with single file conversion
 get_user_input
 
+# Default overwrite flag for ffmpeg
+OVERWRITE_FLAG="-y"
+
+# Validate input and output file paths
 if [[ -z "$INPUT_FILE" || -z "$OUTPUT_FILE" ]]; then
   echo "❌ No file selected. Aborting."
   exit 1
 fi
 
+# Prevent overwriting input file
+if [[ "$(realpath "$INPUT_FILE")" == "$(realpath "$OUTPUT_FILE")" ]]; then
+  echo "❌ Input and output file are the same. Aborting to prevent overwrite."
+  exit 1
+fi
+
+# Build ffmpeg command as array for safe execution
 convert_command=(
   ffmpeg $OVERWRITE_FLAG -i "$INPUT_FILE" -c:v "$ENCODER" -preset medium \
   -b:v "${BITRATE}M" -qp "$QUALITY" -map 0:v -map 0:a \
   -c:a aac -b:a 192k "$OUTPUT_FILE"
 )
 
+# Execute conversion and show progress/output depending on UI
 case "$UI" in
   yad)
+    # Show live log in YAD window
     LOGFILE=$(mktemp)
     "${convert_command[@]}" &> "$LOGFILE" &
     FFMPEG_PID=$!
@@ -199,19 +345,21 @@ case "$UI" in
     rm "$LOGFILE"
     yad --info \
       --title="✅ Conversion Complete" \
-      --text="Your MKV file has been successfully converted!" \
+      --text="Your file has been successfully converted:\n\n$OUTPUT_FILE" \
       --button="OK:0" \
       --width=400 \
       --height=100
     ;;
   zenity)
+    # Show progress bar in Zenity
     "${convert_command[@]}" | tee >(zenity --progress \
       --title="Converting..." --pulsate --auto-close)
     ;;
   dialog | cli)
+    # Output directly to terminal
     "${convert_command[@]}"
     ;;
 esac
 
+# Final confirmation
 echo "✅ Conversion complete!"
-
