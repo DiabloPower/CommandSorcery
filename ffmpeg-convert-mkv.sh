@@ -113,9 +113,9 @@ done
 
 if $IS_MAXWELL; then
   echo "⚠️ Maxwell GPU found – YUV444 deactivated."
-  NVENC_OPTS="-pix_fmt yuv420p"
+  NVENC_PIXFMT="yuv420p"
 else
-  NVENC_OPTS="-pix_fmt yuv444p"
+  NVENC_PIXFMT="yuv444p"
 fi
 
 # ─────────────────────────────────────────────
