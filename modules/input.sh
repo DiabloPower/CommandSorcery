@@ -360,3 +360,11 @@ run_ffmpeg_single() {
       ;;
   esac
 }
+
+select_audio_opts() {
+  if [[ "$AUDIO_CHANNELS" -gt 2 ]]; then
+    echo "-c:a aac -b:a 384k -ac 2"
+  else
+    echo "-c:a aac -b:a 192k"
+  fi
+}
