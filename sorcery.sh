@@ -21,25 +21,26 @@
 BASE_URL="https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main"
 SELF_PATH="$0"
 SELF_NAME=$(basename "$0")
+declare -A SCRIPTS
+declare -A SCRIPT_OPTIONS
+declare -A SCRIPT_OPTIONS_DESC
 
 # Load modules
 load_module() {
   local name="$1"
-  local local_path="$(dirname "$SELF_PATH")/modules/$name.sh"
+  local base_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local local_path="$base_dir/modules/$name.sh"
   local remote_url="$BASE_URL/modules/$name.sh"
 
-  if [[ "$SELF_PATH" == /dev/fd/* ]]; then
-    # Remote mode
-    if ! source <(curl -fsSL "$remote_url"); then
-      echo "❌ Failed to load module '$name' from $remote_url"
-      exit 1
-    fi
+  if [[ -f "$local_path" ]]; then
+    source "$local_path"
+    echo "📦 Loaded local module: $name"
   else
-    # Local mode
-    if [[ -f "$local_path" ]]; then
-      source "$local_path"
+    echo "🌐 Local module '$name' not found, trying online..."
+    if curl -fsSL "$remote_url" | source /dev/stdin; then
+      echo "✅ Loaded remote module: $name"
     else
-      echo "❌ Local module '$name' not found at $local_path"
+      echo "❌ Failed to load module '$name' from $remote_url"
       exit 1
     fi
   fi
@@ -47,11 +48,9 @@ load_module() {
 
 load_module ui
 load_module install
-if [[ "$SELF_PATH" == /dev/fd/* ]]; then
-  source <(curl -fsSL "$BASE_URL/modules/registry.sh")
-else
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/modules/registry.sh"
-fi
+load_module registry
+
+splash_sorcerer
 
 # ─────────────────────────────────────────────
 # 🧾 Help
