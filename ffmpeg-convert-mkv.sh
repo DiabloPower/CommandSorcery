@@ -43,6 +43,7 @@ show_help() {
 
 # Parse command-line arguments
 for arg in "$@"; do
+  [[ -z "$arg" ]] && continue
   case "$arg" in
     --install-if-missing=*) INSTALL_GUI_TOOL="${arg#*=}" ;;
     --yad) UI="yad" ;;
