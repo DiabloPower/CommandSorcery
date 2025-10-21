@@ -105,19 +105,9 @@ if $BATCH_MODE; then
 else
   get_ffmpeg_input "$UI_TOOL" || exit 1
   get_ffmpeg_single_input "$UI_TOOL" || exit 1
+  if [[ "$(realpath "$INPUT_FILE")" == "$(realpath "$OUTPUT_FILE")" ]]; then
+    echo "❌ Input and output file are the same. Aborting."
+    exit 1
+  fi
+  run_ffmpeg_single "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_FILE" "$OUTPUT_FILE" "$UI_TOOL"
 fi
-
-# ─────────────────────────────────────────────
-# 🚀 single convertion
-# ─────────────────────────────────────────────
-
-if [[ "$(realpath "$INPUT_FILE")" == "$(realpath "$OUTPUT_FILE")" ]]; then
-  echo "❌ Input and output file are the same. Aborting."
-  exit 1
-fi
-
-ffmpeg -y -i "$INPUT_FILE" -c:v "$ENCODER" -preset medium \
-  -b:v "${BITRATE}M" -qp "$QUALITY" -map 0:v -map 0:a \
-  -c:a aac -b:a 192k "$OUTPUT_FILE"
-
-echo "✅ Conversion complete: $OUTPUT_FILE"
