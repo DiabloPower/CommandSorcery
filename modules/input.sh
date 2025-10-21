@@ -198,6 +198,7 @@ run_ffmpeg_batch() {
   local mode="$6"
   local pix_fmt="$7"
   local ratecontrol="$8"
+  local audio_opts="$9"
 
   echo "📦 Starte Batch-Konvertierung..."
   shopt -s nullglob
@@ -231,7 +232,7 @@ run_ffmpeg_batch() {
         script -q -c "stdbuf -oL -eL ffmpeg -y -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
           -pix_fmt "$pix_fmt" \
           -b:v '${bitrate}M' -qp '$quality' -map 0:v -map 0:a \
-          -c:a aac -b:a 192k '$out'" /dev/null
+          $audio_opts '$out'" /dev/null
       )
       [[ $? -eq 0 ]] && ((success++)) || ((fail++))
     else
@@ -240,7 +241,7 @@ run_ffmpeg_batch() {
       stdbuf -oL -eL ffmpeg -y -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
         -pix_fmt "$pix_fmt" \
         -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
-        -c:a aac -b:a 192k "$out" >> "$LOGTMP" 2>&1 &
+        $audio_opts "$out" >> "$LOGTMP" 2>&1 &
       FFMPEG_PID=$!
 
       tail -f "$LOGTMP" >> "$LOGFILE" &
@@ -290,6 +291,7 @@ run_ffmpeg_single() {
   local mode="$6"
   local pix_fmt="$7"
   local ratecontrol="$8"
+  local audio_opts="$9"
 
   if [[ "$(realpath "$input")" == "$(realpath "$output")" ]]; then
     echo "❌ Input and output file are the same. Aborting."
@@ -300,7 +302,7 @@ run_ffmpeg_single() {
     ffmpeg -y -i "$input" -c:v "$encoder" $ratecontrol -preset medium \
     -pix_fmt "$pix_fmt" \
     -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
-    -c:a aac -b:a 192k "$output"
+    $audio_opts "$output"
   )
 
   case "$mode" in
