@@ -119,3 +119,63 @@ select_script_ui() {
       ;;
   esac
 }
+
+select_script_options_ui() {
+  local mode="$UI_TOOL"
+  local script="$1"
+  local options="${SCRIPT_OPTIONS[$script]}"
+  [[ -z "$options" ]] && return 0
+
+  local selected=()
+
+  case "$mode" in
+    yad)
+      local fields=()
+      for opt in $options; do
+        local key="${script}${opt}"
+        local desc="${SCRIPT_OPTIONS_DESC[$key]:-$opt}"
+        fields+=("--field=${opt} (${desc}):CHK" "FALSE")
+      done
+      local form=$(yad --form --title="⚙️ Options for '$script'" --width=600 --height=300 "${fields[@]}")
+      IFS="|" read -r -a values <<< "$form"
+      local i=0
+      for opt in $options; do
+        [[ "${values[$i]}" == "TRUE" ]] && selected+=("$opt")
+        ((i++))
+      done
+      ;;
+    zenity)
+      local list=""
+      for opt in $options; do
+        local key="${script}${opt}"
+        local desc="${SCRIPT_OPTIONS_DESC[$key]:-$opt}"
+        list+="$opt – $desc\n"
+      done
+      local result=$(zenity --entry \
+        --title="⚙️ Options for '$script'" \
+        --text="Enter desired options (e.g. --batch --fast):\n\n$list")
+      read -ra selected <<< "$result"
+      ;;
+    dialog)
+      local list=""
+      for opt in $options; do
+        local key="${script}${opt}"
+        local desc="${SCRIPT_OPTIONS_DESC[$key]:-$opt}"
+        list+="$opt – $desc\n"
+      done
+      local result=$(dialog --inputbox "⚙️ Options for '$script':\n\n$list" 20 70 3>&1 1>&2 2>&3)
+      read -ra selected <<< "$result"
+      ;;
+    cli)
+      echo -e "⚙️ Options for '$script':"
+      for opt in $options; do
+        local key="${script}${opt}"
+        echo "  $opt – ${SCRIPT_OPTIONS_DESC[$key]:-$opt}"
+      done
+      read -rp "Enter desired options (e.g. --batch --fast): " result
+      read -ra selected <<< "$result"
+      ;;
+  esac
+
+  printf "%s\n" "${selected[@]}"
+}
