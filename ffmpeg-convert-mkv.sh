@@ -140,6 +140,11 @@ if $BATCH_MODE; then
 else
   get_ffmpeg_input "$UI_TOOL" || exit 1
   get_ffmpeg_single_input "$UI_TOOL" || exit 1
+  if [[ "$AUDIO_CHANNELS" -gt 2 ]]; then
+    AUDIO_OPTS="-c:a aac -b:a 384k -ac 2"
+  else
+    AUDIO_OPTS="-c:a aac -b:a 192k"
+  fi
   if $IS_MAXWELL; then
     NVENC_RATECONTROL="-rc:v constqp -qp $QUALITY"
   else
