@@ -114,7 +114,7 @@ for arg in "$@"; do
   if [[ -n "${SCRIPTS[$arg]}" ]]; then
     SCRIPT="$arg"
   elif [[ "$arg" =~ ^--(yad|zenity|dialog|cli|text)$ ]]; then
-    UI_FLAG="$arg"
+    UI_FLAG="${arg#--}"
   else
     EXTRA_ARGS+=("$arg")
   fi
