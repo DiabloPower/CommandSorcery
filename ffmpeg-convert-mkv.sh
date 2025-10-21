@@ -125,14 +125,24 @@ fi
 if $BATCH_MODE; then
   get_ffmpeg_input "$UI_TOOL" || exit 1
   get_ffmpeg_batch_input "$UI_TOOL" || exit 1
-  run_ffmpeg_batch "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_DIR" "$OUTPUT_DIR" "$UI_TOOL" "$NVENC_PIXFMT"
+  if $IS_MAXWELL; then
+    NVENC_RATECONTROL="-rc:v constqp -qp $QUALITY"
+  else
+    NVENC_RATECONTROL="-rc:v vbr_hq -cq:v $QUALITY -b:v ${BITRATE}M -maxrate:v $((BITRATE + 1))M -bufsize:v $((BITRATE * 2))M"
+  fi
+  run_ffmpeg_batch "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_DIR" "$OUTPUT_DIR" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL"
   exit 0
 else
   get_ffmpeg_input "$UI_TOOL" || exit 1
   get_ffmpeg_single_input "$UI_TOOL" || exit 1
+  if $IS_MAXWELL; then
+    NVENC_RATECONTROL="-rc:v constqp -qp $QUALITY"
+  else
+    NVENC_RATECONTROL="-rc:v vbr_hq -cq:v $QUALITY -b:v ${BITRATE}M -maxrate:v $((BITRATE + 1))M -bufsize:v $((BITRATE * 2))M"
+  fi
   if [[ "$(realpath "$INPUT_FILE")" == "$(realpath "$OUTPUT_FILE")" ]]; then
     echo "❌ Input and output file are the same. Aborting."
     exit 1
   fi
-  run_ffmpeg_single "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_FILE" "$OUTPUT_FILE" "$UI_TOOL" "$NVENC_PIXFMT"
+  run_ffmpeg_single "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_FILE" "$OUTPUT_FILE" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL"
 fi
