@@ -26,6 +26,18 @@ declare -A SCRIPT_OPTIONS
 declare -A SCRIPT_OPTIONS_DESC
 
 # Load modules
+fetch_remote() {
+  local url="$1"
+  if command -v curl &>/dev/null; then
+    curl -fsSL "$url"
+  elif command -v wget &>/dev/null; then
+    wget -qO- "$url"
+  else
+    echo "❌ Neither curl nor wget is available."
+    return 1
+  fi
+}
+
 load_module() {
   local name="$1"
   local base_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,7 +49,7 @@ load_module() {
     echo "📦 Loaded local module: $name"
   else
     echo "🌐 Local module '$name' not found, trying online..."
-    if curl -fsSL "$remote_url" | source /dev/stdin; then
+    if fetch_remote "$remote_url" | source /dev/stdin; then
       echo "✅ Loaded remote module: $name"
     else
       echo "❌ Failed to load module '$name' from $remote_url"
