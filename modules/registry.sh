@@ -18,18 +18,12 @@
 # script or the use or other dealings in the script.
 #
 
-declare -A SCRIPTS=(
-  [gutenberg]="gutenberg.sh"
-  [convert]="ffmpeg-convert-mkv.sh"
-)
+SCRIPTS[gutenberg]="gutenberg.sh"
+SCRIPTS[convert]="ffmpeg-convert-mkv.sh"
 
-declare -A SCRIPT_OPTIONS=(
-  [gutenberg]="--no-toc --no-open"
-  [convert]="--batch"
-)
+SCRIPT_OPTIONS[gutenberg]="--no-toc --no-open"
+SCRIPT_OPTIONS[convert]="--batch"
 
-declare -A SCRIPT_OPTIONS_DESC=(
-  [gutenberg--no-toc]="Remove table of contents"
-  [gutenberg--no-open]="Do not open PDF after download"
-  [convert--batch]="Convert all videos in folder"
-)
+SCRIPT_OPTIONS_DESC[gutenberg--no-toc]="Remove table of contents"
+SCRIPT_OPTIONS_DESC[gutenberg--no-open]="Do not open PDF after download"
+SCRIPT_OPTIONS_DESC[convert--batch]="Convert all videos in folder"
