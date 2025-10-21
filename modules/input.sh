@@ -177,30 +177,50 @@ run_ffmpeg_batch() {
     files+=("$input"/*."$ext")
   done
 
+  local total=${#files[@]}
+  local count=0
   local success=0 fail=0 skipped=0
-  local logfile=$(mktemp)
   local summary=$(mktemp)
-  local pipe=$(mktemp -u)
-  mkfifo "$pipe"
 
   exec {STDOUT_BACKUP}>&1
   exec {STDERR_BACKUP}>&2
 
-  if [[ "$mode" == "yad" ]]; then
-    yad --text-info \
-      --title="🎬 Batch Converting..." \
-      --width=800 --height=400 \
-      --center --wrap --tail --no-buttons < "$pipe" &
-    YAD_PID=$!
-  fi
-
-  exec > >(tee -a "$logfile" > "$pipe")
-  exec 2>&1
+  case "$mode" in
+    yad)
+      local pipe=$(mktemp -u)
+      mkfifo "$pipe"
+      yad --text-info \
+        --title="🎬 Batch Converting..." \
+        --width=800 --height=400 \
+        --center --wrap --tail --no-buttons < "$pipe" &
+      YAD_PID=$!
+      exec > >(tee -a "$pipe")
+      exec 2>&1
+      ;;
+    zenity)
+      ZENITY_FIFO=$(mktemp -u)
+      mkfifo "$ZENITY_FIFO"
+      zenity --progress \
+        --title="Batch Converting..." \
+        --text="Starting conversion..." \
+        --auto-close --no-cancel < "$ZENITY_FIFO" &
+      ZENITY_PID=$!
+      ;;
+    dialog)
+      LOG=$(mktemp)
+      dialog --tailbox "$LOG" 20 80 &
+      DIALOG_PID=$!
+      ;;
+    cli)
+      # Kein exec, direkte Ausgabe
+      ;;
+  esac
 
   for f in "${files[@]}"; do
     [[ -f "$f" ]] || continue
     local base=$(basename "$f")
     local out="${output}/${base%.*}.mkv"
+    ((count++))
 
     if [[ "$(realpath "$f")" == "$(realpath "$out")" ]]; then
       echo "⚠️ Skipping $base — input and output are identical." | tee -a "$summary"
@@ -208,7 +228,23 @@ run_ffmpeg_batch() {
       continue
     fi
 
-    echo "🎬 Converting: $base → $(basename "$out")"
+    case "$mode" in
+      yad)
+        echo "🎬 Converting: $base → $(basename "$out")"
+        ;;
+      zenity)
+        local percent=$((count * 100 / total))
+        echo "$percent" > "$ZENITY_FIFO"
+        echo "# Converting: $base" > "$ZENITY_FIFO"
+        ;;
+      dialog)
+        echo "🎬 Converting: $base → $(basename "$out")" >> "$LOG"
+        ;;
+      cli)
+        echo "🎬 Converting: $base → $(basename "$out")"
+        ;;
+    esac
+
     if ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
       -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
       -c:a aac -b:a 192k "$out"; then
@@ -223,23 +259,37 @@ run_ffmpeg_batch() {
   exec 1>&${STDOUT_BACKUP}
   exec 2>&${STDERR_BACKUP}
 
-  if [[ "$mode" == "yad" ]]; then
-    sleep 1
-    kill "$YAD_PID"
-    rm "$pipe"
-    yad --info \
-      --title="✅ Batch Complete" \
-      --text="All files have been processed.\n\nSuccessful: $success\nFailed: $fail\nSkipped: $skipped" \
-      --button="OK:0" \
-      --width=400 --height=120
-  else
-    echo -e "\n📊 Summary:"
-    echo "  ✔️ Successful: $success"
-    echo "  ❌ Failed:     $fail"
-    echo "  ⚠️ Skipped:    $skipped"
-    echo -e "\n📝 Detailed summary:"
-    cat "$summary"
-  fi
+  case "$mode" in
+    yad)
+      sleep 1
+      kill "$YAD_PID"
+      rm "$pipe"
+      yad --info \
+        --title="✅ Batch Complete" \
+        --text="All files processed.\n\n✔️ $success\n❌ $fail\n⚠️ $skipped" \
+        --button="OK:0" --width=400 --height=120
+      ;;
+    zenity)
+      echo "100" > "$ZENITY_FIFO"
+      rm "$ZENITY_FIFO"
+      kill "$ZENITY_PID" 2>/dev/null
+      zenity --info \
+        --title="✅ Batch Complete" \
+        --text="All files processed.\n\n✔️ $success\n❌ $fail\n⚠️ $skipped"
+      ;;
+    dialog)
+      sleep 1
+      kill "$DIALOG_PID" 2>/dev/null
+      rm "$LOG"
+      dialog --msgbox "✅ Batch complete:\n✔️ $success\n❌ $fail\n⚠️ $skipped" 10 50
+      ;;
+    cli)
+      echo -e "\n✅ Batch complete:"
+      echo "✔️ Successful: $success"
+      echo "❌ Failed:     $fail"
+      echo "⚠️ Skipped:    $skipped"
+      ;;
+  esac
 
-  rm "$logfile" "$summary"
+  rm "$summary"
 }
