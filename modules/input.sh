@@ -169,7 +169,7 @@ run_ffmpeg_batch() {
   local output="$5"
   local mode="$6"
 
-  echo "📦 Starting batch conversion..."
+  echo "📦 Starte Batch-Konvertierung..."
   shopt -s nullglob
   local formats=(mp4 mkv avi mov flv webm mpeg mpg m4v ts wmv ogg)
   local files=()
@@ -180,39 +180,18 @@ run_ffmpeg_batch() {
   local total=${#files[@]}
   local count=0
   local success=0 fail=0 skipped=0
-  local summary=$(mktemp)
-
-  exec {STDOUT_BACKUP}>&1
-  exec {STDERR_BACKUP}>&2
 
   case "$mode" in
     yad)
-      local pipe=$(mktemp -u)
-      mkfifo "$pipe"
-      yad --text-info \
+      LOGFILE=$(mktemp)
+      tail -f "$LOGFILE" | yad --text-info \
         --title="🎬 Batch Converting..." \
         --width=800 --height=400 \
-        --center --wrap --tail --no-buttons < "$pipe" &
-      YAD_PID=$!
-      exec > >(tee -a "$pipe")
-      exec 2>&1
+        --center --wrap --tail --no-buttons &
+      UI_PID=$!
       ;;
-    zenity)
-      ZENITY_FIFO=$(mktemp -u)
-      mkfifo "$ZENITY_FIFO"
-      zenity --progress \
-        --title="Batch Converting..." \
-        --text="Starting conversion..." \
-        --auto-close --no-cancel < "$ZENITY_FIFO" &
-      ZENITY_PID=$!
-      ;;
-    dialog)
-      LOG=$(mktemp)
-      dialog --tailbox "$LOG" 20 80 &
-      DIALOG_PID=$!
-      ;;
-    cli)
-      # Kein exec, direkte Ausgabe
+    dialog|zenity|cli)
+      echo "🎬 Dateien zum Konvertieren: $total"
       ;;
   esac
 
@@ -223,73 +202,56 @@ run_ffmpeg_batch() {
     ((count++))
 
     if [[ "$(realpath "$f")" == "$(realpath "$out")" ]]; then
-      echo "⚠️ Skipping $base — input and output are identical." | tee -a "$summary"
       ((skipped++))
+      case "$mode" in
+        yad) echo "⚠️ Überspringe (gleiches Ziel): $base" >> "$LOGFILE" ;;
+        *) echo "⚠️ Überspringe (gleiches Ziel): $base" ;;
+      esac
       continue
     fi
 
     case "$mode" in
       yad)
-        echo "🎬 Converting: $base → $(basename "$out")"
+        echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
+        ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
+          -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+          -c:a aac -b:a 192k "$out" >> "$LOGFILE" 2>&1
         ;;
-      zenity)
-        local percent=$((count * 100 / total))
-        echo "$percent" > "$ZENITY_FIFO"
-        echo "# Converting: $base" > "$ZENITY_FIFO"
-        ;;
-      dialog)
-        echo "🎬 Converting: $base → $(basename "$out")" >> "$LOG"
-        ;;
-      cli)
-        echo "🎬 Converting: $base → $(basename "$out")"
+      *)
+        echo "🎬 Konvertiere: $base → $(basename "$out")"
+        ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
+          -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+          -c:a aac -b:a 192k "$out"
         ;;
     esac
 
-    if ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
-      -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
-      -c:a aac -b:a 192k "$out"; then
-      echo "✅ Success: $base" | tee -a "$summary"
-      ((success++))
-    else
-      echo "❌ Failed: $base" | tee -a "$summary"
-      ((fail++))
-    fi
+    [[ $? -eq 0 ]] && ((success++)) || ((fail++))
   done
-
-  exec 1>&${STDOUT_BACKUP}
-  exec 2>&${STDERR_BACKUP}
 
   case "$mode" in
     yad)
       sleep 1
-      kill "$YAD_PID"
-      rm "$pipe"
+      kill "$UI_PID" 2>/dev/null
+      rm "$LOGFILE"
       yad --info \
-        --title="✅ Batch Complete" \
-        --text="All files processed.\n\n✔️ $success\n❌ $fail\n⚠️ $skipped" \
+        --title="✅ Batch abgeschlossen" \
+        --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" \
         --button="OK:0" --width=400 --height=120
       ;;
     zenity)
-      echo "100" > "$ZENITY_FIFO"
-      rm "$ZENITY_FIFO"
-      kill "$ZENITY_PID" 2>/dev/null
       zenity --info \
-        --title="✅ Batch Complete" \
-        --text="All files processed.\n\n✔️ $success\n❌ $fail\n⚠️ $skipped"
+        --title="✅ Batch abgeschlossen" \
+        --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped"
       ;;
     dialog)
-      sleep 1
-      kill "$DIALOG_PID" 2>/dev/null
-      rm "$LOG"
-      dialog --msgbox "✅ Batch complete:\n✔️ $success\n❌ $fail\n⚠️ $skipped" 10 50
+      dialog --msgbox "✅ Batch abgeschlossen:\n✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" 10 50
       ;;
     cli)
-      echo -e "\n✅ Batch complete:"
-      echo "✔️ Successful: $success"
-      echo "❌ Failed:     $fail"
-      echo "⚠️ Skipped:    $skipped"
+      echo ""
+      echo "📊 Zusammenfassung:"
+      echo "✔️ Erfolgreich: $success"
+      echo "❌ Fehlgeschlagen: $fail"
+      echo "⚠️ Übersprungen: $skipped"
       ;;
   esac
-
-  rm "$summary"
 }
