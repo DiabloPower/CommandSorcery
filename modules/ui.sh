@@ -17,6 +17,15 @@
 # script or the use or other dealings in the script.
 #
 
+splash_sorcerer() {
+  echo ""
+  echo "╔════════════════════════════════════════════════════╗"
+  echo "║             🧙‍♂️  CommandSorcery Launcher           ║"
+  echo "║        Modular. Remote-ready. Bash as spellwork.   ║"
+  echo "╚════════════════════════════════════════════════════╝"
+  echo ""
+}
+
 # Detect best available UI tool or apply override
 detect_ui() {
   local override="$1"
