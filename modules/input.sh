@@ -196,6 +196,7 @@ run_ffmpeg_batch() {
   local input="$4"
   local output="$5"
   local mode="$6"
+  local pix_fmt="$7"
 
   echo "📦 Starte Batch-Konvertierung..."
   shopt -s nullglob
@@ -227,6 +228,7 @@ run_ffmpeg_batch() {
     if [[ "$mode" == "dialog" ]]; then
       dialog --programbox "🎬 Konvertiere: $base → $(basename "$out")" 25 100 < <(
         script -q -c "stdbuf -oL -eL ffmpeg -y -i '$f' -c:v '$encoder' -preset medium \
+          -pix_fmt "$pix_fmt" \
           -b:v '${bitrate}M' -qp '$quality' -map 0:v -map 0:a \
           -c:a aac -b:a 192k '$out'" /dev/null
       )
@@ -235,6 +237,7 @@ run_ffmpeg_batch() {
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
       local LOGTMP=$(mktemp)
       stdbuf -oL -eL ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
+        -pix_fmt "$pix_fmt" \
         -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
         -c:a aac -b:a 192k "$out" >> "$LOGTMP" 2>&1 &
       FFMPEG_PID=$!
@@ -284,6 +287,7 @@ run_ffmpeg_single() {
   local input="$4"
   local output="$5"
   local mode="$6"
+  local pix_fmt="$7"
 
   if [[ "$(realpath "$input")" == "$(realpath "$output")" ]]; then
     echo "❌ Input and output file are the same. Aborting."
@@ -292,6 +296,7 @@ run_ffmpeg_single() {
 
   local convert_command=(
     ffmpeg -y -i "$input" -c:v "$encoder" -preset medium \
+    -pix_fmt "$pix_fmt" \
     -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
     -c:a aac -b:a 192k "$output"
   )
