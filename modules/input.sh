@@ -161,6 +161,34 @@ get_ffmpeg_batch_input() {
   export INPUT_DIR OUTPUT_DIR
 }
 
+start_live_log() {
+  local mode="$1"
+  local logfile="$2"
+  case "$mode" in
+    yad)
+      tail -f "$logfile" | yad --text-info \
+        --title="🎬 Batch Converting..." \
+        --width=800 --height=400 \
+        --center --wrap --tail --no-buttons &
+      ;;
+    zenity)
+      tail -f "$logfile" &  # Terminalausgabe statt Zenity
+      ;;
+    dialog)
+      dialog --tailbox "$logfile" 20 80 &
+      ;;
+    cli)
+      tail -f "$logfile" &
+      ;;
+  esac
+  UI_PID=$!
+}
+
+stop_live_log() {
+  sleep 1
+  kill "$UI_PID" 2>/dev/null
+}
+
 run_ffmpeg_batch() {
   local encoder="$1"
   local bitrate="$2"
@@ -181,19 +209,8 @@ run_ffmpeg_batch() {
   local count=0
   local success=0 fail=0 skipped=0
 
-  case "$mode" in
-    yad)
-      LOGFILE=$(mktemp)
-      tail -f "$LOGFILE" | yad --text-info \
-        --title="🎬 Batch Converting..." \
-        --width=800 --height=400 \
-        --center --wrap --tail --no-buttons &
-      UI_PID=$!
-      ;;
-    dialog|zenity|cli)
-      echo "🎬 Dateien zum Konvertieren: $total"
-      ;;
-  esac
+  local LOGFILE=""
+  [[ "$mode" != "dialog" ]] && LOGFILE=$(mktemp) && start_live_log "$mode" "$LOGFILE"
 
   for f in "${files[@]}"; do
     [[ -f "$f" ]] || continue
@@ -203,36 +220,40 @@ run_ffmpeg_batch() {
 
     if [[ "$(realpath "$f")" == "$(realpath "$out")" ]]; then
       ((skipped++))
-      case "$mode" in
-        yad) echo "⚠️ Überspringe (gleiches Ziel): $base" >> "$LOGFILE" ;;
-        *) echo "⚠️ Überspringe (gleiches Ziel): $base" ;;
-      esac
+      [[ "$mode" != "dialog" ]] && echo "⚠️ Überspringe (gleiches Ziel): $base" >> "$LOGFILE"
       continue
     fi
 
-    case "$mode" in
-      yad)
-        echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
-        ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
-          -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
-          -c:a aac -b:a 192k "$out" >> "$LOGFILE" 2>&1
-        ;;
-      *)
-        echo "🎬 Konvertiere: $base → $(basename "$out")"
-        ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
-          -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
-          -c:a aac -b:a 192k "$out"
-        ;;
-    esac
+    if [[ "$mode" == "dialog" ]]; then
+      dialog --programbox "🎬 Konvertiere: $base → $(basename "$out")" 25 100 < <(
+        script -q -c "stdbuf -oL -eL ffmpeg -y -i '$f' -c:v '$encoder' -preset medium \
+          -b:v '${bitrate}M' -qp '$quality' -map 0:v -map 0:a \
+          -c:a aac -b:a 192k '$out'" /dev/null
+      )
+      [[ $? -eq 0 ]] && ((success++)) || ((fail++))
+    else
+      echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
+      local LOGTMP=$(mktemp)
+      stdbuf -oL -eL ffmpeg -y -i "$f" -c:v "$encoder" -preset medium \
+        -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+        -c:a aac -b:a 192k "$out" >> "$LOGTMP" 2>&1 &
+      FFMPEG_PID=$!
 
-    [[ $? -eq 0 ]] && ((success++)) || ((fail++))
+      tail -f "$LOGTMP" >> "$LOGFILE" &
+      TAIL_PID=$!
+
+      wait "$FFMPEG_PID"
+      kill "$TAIL_PID" 2>/dev/null
+      rm "$LOGTMP"
+
+      [[ $? -eq 0 ]] && ((success++)) || ((fail++))
+    fi
   done
+
+  [[ "$mode" != "dialog" ]] && stop_live_log && rm "$LOGFILE"
 
   case "$mode" in
     yad)
-      sleep 1
-      kill "$UI_PID" 2>/dev/null
-      rm "$LOGFILE"
       yad --info \
         --title="✅ Batch abgeschlossen" \
         --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" \
@@ -240,11 +261,11 @@ run_ffmpeg_batch() {
       ;;
     zenity)
       zenity --info \
-        --title="✅ Batch abgeschlossen" \
+        --title="✅ Zusammenfassung" \
         --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped"
       ;;
     dialog)
-      dialog --msgbox "✅ Batch abgeschlossen:\n✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" 10 50
+      dialog --msgbox "✅ Batch abgeschlossen:\n✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" 10 60
       ;;
     cli)
       echo ""
@@ -252,6 +273,81 @@ run_ffmpeg_batch() {
       echo "✔️ Erfolgreich: $success"
       echo "❌ Fehlgeschlagen: $fail"
       echo "⚠️ Übersprungen: $skipped"
+      ;;
+  esac
+}
+
+run_ffmpeg_single() {
+  local encoder="$1"
+  local bitrate="$2"
+  local quality="$3"
+  local input="$4"
+  local output="$5"
+  local mode="$6"
+
+  if [[ "$(realpath "$input")" == "$(realpath "$output")" ]]; then
+    echo "❌ Input and output file are the same. Aborting."
+    return 1
+  fi
+
+  local convert_command=(
+    ffmpeg -y -i "$input" -c:v "$encoder" -preset medium \
+    -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+    -c:a aac -b:a 192k "$output"
+  )
+
+  case "$mode" in
+    yad)
+      local LOGFILE=$(mktemp)
+      "${convert_command[@]}" &> "$LOGFILE" &
+      local FFMPEG_PID=$!
+      tail -f "$LOGFILE" | yad --text-info \
+        --title="🎬 Converting..." \
+        --width=800 --height=400 \
+        --center --wrap --tail --no-buttons &
+      local TAIL_PID=$!
+      wait "$FFMPEG_PID"
+      kill "$TAIL_PID"
+      rm "$LOGFILE"
+      yad --info \
+        --title="✅ Conversion Complete" \
+        --text="Your file has been successfully converted:\n\n$output" \
+        --button="OK:0" \
+        --width=400 --height=100
+      ;;
+    zenity)
+      local FIFO=$(mktemp -u)
+      mkfifo "$FIFO"
+      zenity --progress \
+        --title="Converting..." \
+        --text="Starting conversion..." \
+        --auto-close --no-cancel < "$FIFO" &
+      local ZENITY_PID=$!
+      {
+        "${convert_command[@]}" 2>&1 | while IFS= read -r line; do
+          echo "# $line"
+        done
+        echo "100"
+      } > "$FIFO" &
+      local WRITER_PID=$!
+      wait "$WRITER_PID"
+      rm "$FIFO"
+      kill "$ZENITY_PID" 2>/dev/null
+      zenity --info --title="✅ Done" --text="Conversion complete:\n$output"
+      ;;
+    dialog)
+      local LOG=$(mktemp)
+      "${convert_command[@]}" &> "$LOG" &
+      local FFMPEG_PID=$!
+      dialog --tailbox "$LOG" 25 100
+      wait "$FFMPEG_PID"
+      rm "$LOG"
+      dialog --msgbox "✅ Conversion complete:\n$output" 8 60
+      ;;
+    cli)
+      echo "🎬 Converting..."
+      "${convert_command[@]}"
+      echo "✅ Conversion complete: $output"
       ;;
   esac
 }
