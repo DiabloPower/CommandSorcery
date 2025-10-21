@@ -146,7 +146,7 @@ select_script_options_ui() {
         local desc="${SCRIPT_OPTIONS_DESC[$key]:-$opt}"
         fields+=("--field=${opt} (${desc}):CHK" "FALSE")
       done
-      local form=$(yad --form --title="⚙️ Options for '$script'" --width=600 --height=300 "${fields[@]}")
+      local form=$(yad --form --title="⚙️ Options for '$script'" --width=600 --height=300 --center "${fields[@]}")
       IFS="|" read -r -a values <<< "$form"
       local i=0
       for opt in $options; do
