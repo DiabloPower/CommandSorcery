@@ -313,7 +313,7 @@ run_ffmpeg_single() {
         --title="✅ Conversion Complete" \
         --text="Your file has been successfully converted:\n\n$output" \
         --button="OK:0" \
-        --width=400 --height=100
+        --width=400 --height=100 --center
       ;;
     zenity)
       local FIFO=$(mktemp -u)
