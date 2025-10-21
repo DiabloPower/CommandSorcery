@@ -146,9 +146,9 @@ inject_ui_flag EXTRA_ARGS
 if [[ -z "$SCRIPT" ]]; then
   SCRIPT_KEYS=("${!SCRIPTS[@]}")
   SCRIPT=$(select_script_ui "$UI_FLAG" "${SCRIPT_KEYS[@]}")
+  [[ -z "$SCRIPT" ]] && echo "🚫 Cancelled." && exit 1
   mapfile -t OPTIONAL_FLAGS < <(select_script_options_ui "$SCRIPT")
   [[ ${#OPTIONAL_FLAGS[@]} -gt 0 ]] && EXTRA_ARGS+=("${OPTIONAL_FLAGS[@]}")
-  [[ -z "$SCRIPT" ]] && echo "🚫 Cancelled." && exit 1
 fi
 
 # ─────────────────────────────────────────────
