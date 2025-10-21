@@ -94,6 +94,31 @@ fi
 ENCODER=$(ffmpeg -hide_banner -encoders 2>/dev/null | grep -q hevc_nvenc && echo "hevc_nvenc" || echo "libx265")
 
 # ─────────────────────────────────────────────
+# 🧠 GPU-Compatability check
+# ─────────────────────────────────────────────
+
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n1)
+echo "🧠 Detected GPU: $GPU_NAME"
+
+# List of known Maxwell-Cards
+MAXWELL_GPUS=("GTX 750" "GTX 750 Ti" "GTX 950" "GTX 960" "GTX 970" "GTX 980" "GTX 980 Ti" "GTX TITAN X")
+
+IS_MAXWELL=false
+for model in "${MAXWELL_GPUS[@]}"; do
+  if [[ "$GPU_NAME" == *"$model"* ]]; then
+    IS_MAXWELL=true
+    break
+  fi
+done
+
+if $IS_MAXWELL; then
+  echo "⚠️ Maxwell GPU found – YUV444 deactivated."
+  NVENC_OPTS="-pix_fmt yuv420p"
+else
+  NVENC_OPTS="-pix_fmt yuv444p"
+fi
+
+# ─────────────────────────────────────────────
 # 📥 get input
 # ─────────────────────────────────────────────
 
