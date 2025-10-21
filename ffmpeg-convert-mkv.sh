@@ -135,7 +135,7 @@ if $BATCH_MODE; then
   else
     NVENC_RATECONTROL="-rc:v vbr_hq -cq:v $QUALITY -b:v ${BITRATE}M -maxrate:v $((BITRATE + 1))M -bufsize:v $((BITRATE * 2))M"
   fi
-  run_ffmpeg_batch "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_DIR" "$OUTPUT_DIR" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL"
+  run_ffmpeg_batch "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_DIR" "$OUTPUT_DIR" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL" "$AUDIO_OPTS"
   exit 0
 else
   get_ffmpeg_input "$UI_TOOL" || exit 1
@@ -149,5 +149,5 @@ else
     echo "❌ Input and output file are the same. Aborting."
     exit 1
   fi
-  run_ffmpeg_single "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_FILE" "$OUTPUT_FILE" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL"
+  run_ffmpeg_single "$ENCODER" "$BITRATE" "$QUALITY" "$INPUT_FILE" "$OUTPUT_FILE" "$UI_TOOL" "$NVENC_PIXFMT" "$NVENC_RATECONTROL" "$AUDIO_OPTS"
 fi
