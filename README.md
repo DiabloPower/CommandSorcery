@@ -117,6 +117,33 @@ to be continued...
 
 This project was developed and tested on a Debian-based system (Zorin OS 17.3). The scripts attempt to install their required dependencies automatically via apt, if missing.
 
+## 🧠 Remote Execution from GitHub
+You can run these scripts directly from GitHub without downloading them manually. This is useful for quick usage, automation, or testing across multiple systems.
+
+### 🧾 Example: Run gutenberg.sh directly
+```bash
+bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/gutenberg.sh)
+```
+Or using wget:
+```bash
+bash <(wget -qO - https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/gutenberg.sh)
+```
+### 🎬 Example: Run ffmpeg-convert-mkv.sh directly
+```bash
+bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh)
+```
+Or using wget:
+```bash
+bash <(wget -qO - https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh)
+```
+You can pass any flags as usual, for example:
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main/ffmpeg-convert-mkv.sh) --batch --yad
+```
+
+⚠️ Note: This requires internet access and assumes the script is compatible with your system. Dependencies will be installed automatically if missing (via apt).
+
 ## 📜 License
 
 ```plaintext
