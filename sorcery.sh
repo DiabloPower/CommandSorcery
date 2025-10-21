@@ -22,6 +22,31 @@ BASE_URL="https://raw.githubusercontent.com/DiabloPower/CommandSorcery/main"
 SELF_PATH="$0"
 SELF_NAME=$(basename "$0")
 
+# Load modules
+load_module() {
+  local name="$1"
+  local local_path="$(dirname "$SELF_PATH")/modules/$name.sh"
+  local remote_url="$BASE_URL/modules/$name.sh"
+
+  if [[ "$SELF_PATH" == /dev/fd/* ]]; then
+    # Remote mode
+    if ! source <(curl -fsSL "$remote_url"); then
+      echo "❌ Failed to load module '$name' from $remote_url"
+      exit 1
+    fi
+  else
+    # Local mode
+    if [[ -f "$local_path" ]]; then
+      source "$local_path"
+    else
+      echo "❌ Local module '$name' not found at $local_path"
+      exit 1
+    fi
+  fi
+}
+load_module ui
+load_module install
+
 declare -A SCRIPTS=(
   [gutenberg]="gutenberg.sh"
   [convert]="ffmpeg-convert-mkv.sh"
@@ -38,30 +63,14 @@ if [[ "$1" == "--help" ]]; then
   echo "Usage: ./sorcery.sh [SCRIPT] [OPTIONS]"
   echo ""
   echo "Available scripts:"
-  for key in "${!SCRIPTS[@]}"; do
-    echo "  $key"
-  done
+  for key in "${!SCRIPTS[@]}"; do echo "  $key"; done
   echo ""
   echo "Interface options:"
-  echo "  --yad           – Use YAD graphical interface"
-  echo "  --zenity        – Use Zenity graphical interface"
-  echo "  --dialog        – Use Dialog (text-based UI)"
-  echo "  --cli           – Use pure command-line input"
-  echo ""
-  echo "Functional options (passed to the selected script):"
-  echo "  --batch         – Enable batch mode for video conversion"
-  echo "  --no-open       – Do not open the PDF after creation (gutenberg)"
-  echo "  --no-toc        – Skip table of contents in PDF (gutenberg)"
-  echo "  --install-if-missing=yad|zenity|dialog – Install GUI tool if missing"
+  echo "  --yad | --zenity | --dialog | --cli"
   echo ""
   echo "Other options:"
   echo "  --update-self   – Update this launcher script from GitHub"
   echo "  --help          – Show this help message"
-  echo ""
-  echo "Examples:"
-  echo "  ./sorcery.sh gutenberg --yad --no-open"
-  echo "  ./sorcery.sh convert --batch --cli"
-  echo "  ./sorcery.sh --update-self"
   echo ""
   exit 0
 fi
@@ -77,7 +86,6 @@ if [[ "$1" == "--update-self" ]]; then
   if [[ "$STATUS" == "200" ]]; then
     echo "📦 Creating backup: ${SELF_PATH}.bak"
     cp "$SELF_PATH" "${SELF_PATH}.bak"
-
     echo "⬇️ Downloading latest version..."
     curl -s "$BASE_URL/sorcery.sh" -o "$SELF_PATH" && chmod +x "$SELF_PATH"
     echo "✅ Updated successfully."
@@ -92,13 +100,7 @@ fi
 # 🧰 Check dependencies
 # ─────────────────────────────────────────────
 
-REQUIRED_TOOLS=(curl wget bash)
-for tool in "${REQUIRED_TOOLS[@]}"; do
-  if ! command -v "$tool" &>/dev/null; then
-    echo "📦 Installing missing tool: $tool"
-    sudo apt update && sudo apt install -y "$tool"
-  fi
-done
+check_core_tools curl wget bash || exit 1
 
 # ─────────────────────────────────────────────
 # 🧭 Parse arguments
@@ -118,77 +120,21 @@ for arg in "$@"; do
   fi
 done
 
-# Inject UI flag into EXTRA_ARGS if not already present
-if [[ -n "$UI_FLAG" && ! " ${EXTRA_ARGS[*]} " =~ " $UI_FLAG " ]]; then
-  EXTRA_ARGS=("$UI_FLAG" "${EXTRA_ARGS[@]}")
-fi
-
 # ─────────────────────────────────────────────
-# 🧠 Auto-select UI if none given
+# 🧠 UI detection
 # ─────────────────────────────────────────────
 
-if [[ -z "$UI_FLAG" ]]; then
-  if command -v yad &>/dev/null; then
-    UI_FLAG="--yad"
-  elif command -v zenity &>/dev/null; then
-    UI_FLAG="--zenity"
-  elif command -v dialog &>/dev/null; then
-    UI_FLAG="--dialog"
-  else
-    UI_FLAG="--cli"
-  fi
-fi
+detect_ui "$UI_FLAG"
+inject_ui_flag EXTRA_ARGS
 
 # ─────────────────────────────────────────────
 # 🪄 Script selection via UI
 # ─────────────────────────────────────────────
 
 if [[ -z "$SCRIPT" ]]; then
-  case "$UI_FLAG" in
-    --yad)
-      SCRIPT_LIST=$(IFS="!"; echo "${!SCRIPTS[*]}")
-      CHOICE=$(yad --form \
-        --title="🧙‍♂️ CommandSorcery Launcher" \
-        --width=400 --height=200 \
-        --center \
-        --field="Choose script":CB "$SCRIPT_LIST")
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      SCRIPT=$(echo "$CHOICE" | cut -d'|' -f1)
-      ;;
-    --zenity)
-      CHOICE=$(zenity --list \
-        --title="🧙‍♂️ CommandSorcery Launcher" \
-        --column="Available Scripts" "${!SCRIPTS[@]}")
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      SCRIPT="$CHOICE"
-      ;;
-    --dialog)
-      MENU_ITEMS=()
-      i=1
-      for key in "${!SCRIPTS[@]}"; do
-        MENU_ITEMS+=("$i" "$key")
-        ((i++))
-      done
-      CHOICE=$(dialog --menu "Choose script" 15 50 ${#MENU_ITEMS[@]} "${MENU_ITEMS[@]}" 3>&1 1>&2 2>&3)
-      [ $? -ne 0 ] && echo "🚫 Cancelled." && exit 1
-      SCRIPT=$(echo "${!SCRIPTS[@]}" | awk -v n="$CHOICE" '{print $n}')
-      ;;
-    --cli|--text)
-      echo "🧙‍♂️ Available scripts:"
-      i=1
-      for key in "${!SCRIPTS[@]}"; do
-        echo "  $i) $key"
-        ((i++))
-      done
-      read -rp "Choose script [name or number]: " CHOICE
-      if [[ -n "${SCRIPTS[$CHOICE]}" ]]; then
-        SCRIPT="$CHOICE"
-      else
-        INDEXED=("${!SCRIPTS[@]}")
-        SCRIPT="${INDEXED[$((CHOICE-1))]}"
-      fi
-      ;;
-  esac
+  SCRIPT_KEYS=("${!SCRIPTS[@]}")
+  SCRIPT=$(select_script_ui "$UI_FLAG" "${SCRIPT_KEYS[@]}")
+  [[ -z "$SCRIPT" ]] && echo "🚫 Cancelled." && exit 1
 fi
 
 # ─────────────────────────────────────────────
@@ -200,6 +146,5 @@ if [[ -n "${SCRIPTS[$SCRIPT]}" ]]; then
   bash <(curl -s "$BASE_URL/${SCRIPTS[$SCRIPT]}") "$UI_FLAG" "${EXTRA_ARGS[@]}"
 else
   echo "❌ Unknown script: $SCRIPT"
-  echo "Use --help to see available options."
   exit 1
 fi
