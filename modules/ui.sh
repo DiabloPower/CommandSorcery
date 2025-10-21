@@ -57,7 +57,7 @@ check_ui_tool() {
 # Inject UI flag into argument array (used in sorcery.sh)
 inject_ui_flag() {
   local -n arr=$1
-  local flag="--$UI_TOOL"
+  local flag="--${UI_TOOL#--}"
   if [[ ! " ${arr[*]} " =~ " $flag " ]]; then
     arr=("$flag" "${arr[@]}")
   fi
