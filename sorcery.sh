@@ -49,7 +49,7 @@ load_module() {
     echo "📦 Loaded local module: $name"
   else
     echo "🌐 Local module '$name' not found, trying online..."
-    if fetch_remote "$remote_url" | source /dev/stdin; then
+    if source <(fetch_remote "$remote_url"); then
       echo "✅ Loaded remote module: $name"
     else
       echo "❌ Failed to load module '$name' from $remote_url"
