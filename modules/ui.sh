@@ -130,6 +130,7 @@ select_script_ui() {
 }
 
 select_script_options_ui() {
+  [[ -z "$script" ]] && return 0
   local mode="$UI_TOOL"
   local script="$1"
   local options="${SCRIPT_OPTIONS[$script]}"
