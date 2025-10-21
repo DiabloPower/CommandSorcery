@@ -7,7 +7,7 @@ A growing arsenal of command-line spells — crafted for automation, diagnostics
 
 A shell script for fetching, organizing, and exporting books from [Projekt Gutenberg-DE](https://www.projekt-gutenberg.org/) as polished PDFs.
 
-🧙‍♂️ Interface Options:
+### 🧙‍♂️ Interface Options:
 
 This script supports multiple user interfaces:
 
@@ -18,7 +18,7 @@ This script supports multiple user interfaces:
 
 The interface can be selected automatically based on availability, or manually via command-line override.
 
-🧾 Usage:
+### 🧾 Usage:
 
 To view all available options and usage instructions, simply run:
 
@@ -26,7 +26,7 @@ To view all available options and usage instructions, simply run:
 ./gutenberg.sh --help
 ```
 
-🧰 Core Dependencies
+### 🧰 Core Dependencies
 
 These tools are essential for the script to function properly. If missing, they will be automatically installed via apt (with sudo):
 
@@ -35,7 +35,7 @@ These tools are essential for the script to function properly. If missing, they 
 - lynx – for parsing and extracting text from HTML
 - pdflatex – for generating PDFs via LaTeX (used by Pandoc)
 
-🧩 Optional GUI Dependencies
+### 🧩 Optional GUI Dependencies
 
 These are only installed if explicitly requested via:
 
@@ -53,9 +53,9 @@ Available options:
 
 ## [`ffmpeg-convert-mkv.sh`](./ffmpeg-convert-mkv.sh):
 
-A flexible shell script for converting video files with FFmpeg, supporting hardware acceleration (NVENC) and multiple user interfaces. It accepts virtually any input format (e.g. AVI, MP4, MOV) and re-encodes the video using H.265 — either via libx265 or NVENC if available — while converting audio to AAC. The output container is determined by the file extension you specify, such as .mkv, .mp4, or others.
+A flexible shell script for converting video files with FFmpeg including single-file and batch directory conversion, supporting hardware acceleration (NVENC) and multiple user interfaces. It accepts virtually any input format (e.g. AVI, MP4, MOV) and re-encodes the video using H.265 — either via libx265 or NVENC if available — while converting audio to AAC. The output container is determined by the file extension you specify, such as .mkv, .mp4, or others.
 
-🎛️ Interface Options:
+### 🎛️ Interface Options:
 
 This script supports multiple user interfaces:
 
@@ -66,7 +66,7 @@ This script supports multiple user interfaces:
 
 The interface can be selected manually via command-line flags, or defaults to YAD if available.
 
-🧾 Usage:
+### 🧾 Usage:
 
 To view all available options and usage instructions, simply run:
 
@@ -74,11 +74,11 @@ To view all available options and usage instructions, simply run:
 ./ffmpeg-convert-mkv.sh --help
 ```
 
-🧰 Core Dependencies
+### 🧰 Core Dependencies
 
 ffmpeg – required for video conversion (automatically installed via apt if missing)
 
-🧩 Optional GUI Dependencies
+### 🧩 Optional GUI Dependencies
 
 These are only installed if explicitly requested via:
 
@@ -92,9 +92,23 @@ Available options:
 - zenity – entry dialogs and progress spinner
 - dialog – text-based UI for terminal environments
 
-⚡ Hardware Acceleration
+### ⚡ Hardware Acceleration
 
 If NVIDIA NVENC is available, the script will use hevc_nvenc for faster encoding. Otherwise, it falls back to libx265.
+
+### 🗂️ Batch Mode
+
+This script now supports a powerful batch mode for converting entire directories of video files. You can activate it via:
+
+```bash
+--batch
+```
+When enabled, the script will prompt for input and output directories (via GUI or CLI), then process all supported video formats in one go. It includes:
+
+- ✅ Automatic format detection
+- ✅ Live progress display (YAD)
+- ✅ Summary of successful, failed, and skipped conversions
+- ✅ Safety check to prevent overwriting input files
 
 ---
 to be continued...
