@@ -376,10 +376,10 @@ select_nvenc_ratecontrol() {
 
   if $is_maxwell; then
     # Maxwell: yuv420p
-    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -preset medium -profile:v main -tune hq -pix_fmt yuv420p"
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 4))M -preset medium -profile:v main -tune hq -pix_fmt yuv420p"
   else
     # Turing or newer: yuv444p
-    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -preset medium -profile:v main -tune hq -pix_fmt yuv444p"
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 4))M -preset medium -profile:v main -tune hq -pix_fmt yuv444p"
   fi
 }
 
