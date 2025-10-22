@@ -19,7 +19,7 @@
 
 get_gutenberg_input() {
   local mode="$1"
-  case "$MODE" in
+  case "$mode" in
     yad)
       FORM_OUTPUT=$(yad --form \
         --title="Gutenberg Downloader" \
