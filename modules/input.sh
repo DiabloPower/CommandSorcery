@@ -100,13 +100,27 @@ download_and_convert_gutenberg() {
   wget -q "$cover_url" -O "$cover_image"
   [[ ! -s "$cover_image" ]] && cover_image=""
 
-  echo "\\newpage" > metadata.txt
-  echo "# $title" >> metadata.txt
-  echo "*by $author*" >> metadata.txt
-  echo "" >> metadata.txt
-  [[ -n "$translator" ]] && echo "### Translated by: $TRANSLATOR" >> metadata.txt
-  [[ -n "$publisher" ]] && echo "### Published by: $publisher" >> metadata.txt
-  [[ -n "$cover_image" ]] && echo "![Cover]($cover_image){ width=95% }" >> metadata.txt
+  #echo "\\newpage" > metadata.txt
+  #echo "# $title" >> metadata.txt
+  #echo "*by $author*" >> metadata.txt
+  #echo "" >> metadata.txt
+  #[[ -n "$translator" ]] && echo "### Translated by: $TRANSLATOR" >> metadata.txt
+  #[[ -n "$publisher" ]] && echo "### Published by: $publisher" >> metadata.txt
+  #[[ -n "$cover_image" ]] && echo "![Cover]($cover_image){ width=95% }" >> metadata.txt
+  {
+    echo "\\newpage"
+    echo "# $TITLE"
+    echo ""
+    echo "*by $AUTHOR*"
+    echo ""
+    echo "### Translated by"
+    echo "$TRANSLATOR"
+    echo ""
+    echo "### Published by"
+    echo "$PUBLISHER"
+    echo ""
+    [[ -n "$COVER_IMAGE" ]] && echo "![Cover]($COVER_IMAGE){ width=95% }"
+  } > metadata.txt
 
   local chapter_count=1
   local html_files=(*.html)
