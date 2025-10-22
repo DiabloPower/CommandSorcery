@@ -68,6 +68,11 @@ clean_chapter_text() {
 
 # Main function to download, process, and generate PDF
 download_and_convert_gutenberg() {
+  local url="$1"
+  local output="$2"
+  local target_dir="$3"
+  local disable_toc="$4"
+  
   CHAPTER_COUNT=1
   WORKDIR=$(mktemp -d)
   cd "$WORKDIR" || exit 1
