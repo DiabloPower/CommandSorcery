@@ -247,12 +247,17 @@ run_ffmpeg_batch() {
     fi
 
     if [[ "$mode" == "dialog" ]]; then
-      dialog --programbox "🎬 Konvertiere: $base → $(basename "$out")" 25 100 < <(
-        script -q -c "stdbuf -oL -eL ffmpeg -y $HWACCEL -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
-          -pix_fmt '$pix_fmt' \
-          -map 0:v -map 0:a \
-          $audio_opts '$out'" /dev/null
-      )
+      local LOGTMP=$(mktemp)
+      script -q -c "stdbuf -oL -eL ffmpeg -y $HWACCEL -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
+        -pix_fmt '$pix_fmt' \
+        -map 0:v -map 0:a \
+        $audio_opts '$out'" /dev/null &> "$LOGTMP" &
+      FFMPEG_PID=$!
+      dialog --tailbox "$LOGTMP" 25 100 &
+      TAIL_PID=$!
+      wait "$FFMPEG_PID"
+      kill "$TAIL_PID" 2>/dev/null
+      rm "$LOGTMP"
       [[ $? -eq 0 ]] && ((success++)) || ((fail++))
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
