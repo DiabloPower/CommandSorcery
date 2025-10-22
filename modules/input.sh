@@ -104,8 +104,8 @@ download_and_convert_gutenberg() {
   echo "# $title" >> metadata.txt
   echo "*by $author*" >> metadata.txt
   echo "" >> metadata.txt
-  [[ -n "$translator" ]] && echo "### Translated by\n$translator" >> metadata.txt
-  [[ -n "$publisher" ]] && echo "### Published by\n$publisher" >> metadata.txt
+  [[ -n "$translator" ]] && echo "### Translated by: $TRANSLATOR" >> metadata.txt
+  [[ -n "$publisher" ]] && echo "### Published by: $publisher" >> metadata.txt
   [[ -n "$cover_image" ]] && echo "![Cover]($cover_image){ width=95% }" >> metadata.txt
 
   local chapter_count=1
