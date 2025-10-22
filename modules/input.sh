@@ -172,7 +172,7 @@ start_live_log() {
         --center --wrap --tail --no-buttons &
       ;;
     zenity)
-      tail -f "$logfile" &  # Terminalausgabe statt Zenity
+      tail -f "$logfile" &
       ;;
     dialog)
       dialog --tailbox "$logfile" 20 80 &
@@ -187,6 +187,25 @@ start_live_log() {
 stop_live_log() {
   sleep 1
   kill "$UI_PID" 2>/dev/null
+}
+
+start_spinner() {
+  (
+    while true; do
+      echo "# Konvertierung läuft..."
+      sleep 1
+    done
+  ) | zenity --progress \
+    --title="⏳ Bitte warten..." \
+    --text="Konvertierung läuft..." \
+    --pulsate \
+    --auto-close \
+    --no-cancel &
+  SPINNER_PID=$!
+}
+
+stop_spinner() {
+  kill "$SPINNER_PID" 2>/dev/null
 }
 
 run_ffmpeg_batch() {
@@ -238,6 +257,7 @@ run_ffmpeg_batch() {
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
       local LOGTMP=$(mktemp)
+      [[ "$mode" == "zenity"]] && start_spinner
       stdbuf -oL -eL ffmpeg -y $HWACCEL -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
         -pix_fmt "$pix_fmt" \
         -map 0:v -map 0:a \
@@ -248,6 +268,7 @@ run_ffmpeg_batch() {
       TAIL_PID=$!
 
       wait "$FFMPEG_PID"
+      [[ "$mode" == "zenity"]] && stop_spinner
       kill "$TAIL_PID" 2>/dev/null
       rm "$LOGTMP"
 
@@ -325,23 +346,19 @@ run_ffmpeg_single() {
         --width=400 --height=100 --center
       ;;
     zenity)
-      local FIFO=$(mktemp -u)
-      mkfifo "$FIFO"
-      zenity --progress \
-        --title="Converting..." \
-        --text="Starting conversion..." \
-        --auto-close --no-cancel < "$FIFO" &
-      local ZENITY_PID=$!
-      {
-        "${convert_command[@]}" 2>&1 | while IFS= read -r line; do
-          echo "# $line"
-        done
-        echo "100"
-      } > "$FIFO" &
-      local WRITER_PID=$!
-      wait "$WRITER_PID"
-      rm "$FIFO"
-      kill "$ZENITY_PID" 2>/dev/null
+      start_spinner
+      local LOGFILE=$(mktemp)
+      "${convert_command[@]}" &> "$LOGFILE" &
+      local FFMPEG_PID=$!
+      tail -f "$LOGFILE" | zenity --text-info \
+        --title="🎬 Converting..." \
+        --width=800 --height=400 \
+        --center --wrap --tail --no-buttons &
+      local TAIL_PID=$!
+      wait "$FFMPEG_PID"
+      kill "$TAIL_PID"
+      stop_spinner
+      rm "$LOGFILE"
       zenity --info --title="✅ Done" --text="Conversion complete:\n$output"
       ;;
     dialog)
