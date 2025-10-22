@@ -168,7 +168,7 @@ start_live_log() {
     yad)
       tail -f "$logfile" | yad --text-info \
         --title="🎬 Batch Converting..." \
-        --width=900 --height=500 \
+        --width=1000 --height=600 \
         --center --wrap --tail --no-buttons &
       ;;
     zenity)
