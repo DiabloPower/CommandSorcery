@@ -230,8 +230,8 @@ run_ffmpeg_batch() {
     if [[ "$mode" == "dialog" ]]; then
       dialog --programbox "🎬 Konvertiere: $base → $(basename "$out")" 25 100 < <(
         script -q -c "stdbuf -oL -eL ffmpeg -y $HWACCEL -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
-          -pix_fmt "$pix_fmt" \
-          -b:v '${bitrate}M' -qp '$quality' -map 0:v -map 0:a \
+          -pix_fmt '$pix_fmt' \
+          -map 0:v -map 0:a \
           $audio_opts '$out'" /dev/null
       )
       [[ $? -eq 0 ]] && ((success++)) || ((fail++))
@@ -240,7 +240,7 @@ run_ffmpeg_batch() {
       local LOGTMP=$(mktemp)
       stdbuf -oL -eL ffmpeg -y $HWACCEL -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
         -pix_fmt "$pix_fmt" \
-        -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+        -map 0:v -map 0:a \
         $audio_opts "$out" >> "$LOGTMP" 2>&1 &
       FFMPEG_PID=$!
 
@@ -301,7 +301,7 @@ run_ffmpeg_single() {
   local convert_command=(
     ffmpeg -y $HWACCEL -i "$input" -c:v "$encoder" $ratecontrol -preset medium \
     -pix_fmt "$pix_fmt" \
-    -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
+    -map 0:v -map 0:a \
     $audio_opts "$output"
   )
 
@@ -375,9 +375,11 @@ select_nvenc_ratecontrol() {
   local bitrate="$3"
 
   if $is_maxwell; then
+    # Maxwell: constqp ist stabil und effizient
     echo "-rc:v constqp -qp $quality"
   else
-    echo "-rc:v vbr_hq -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M"
+    # Turing oder neuer: vbr mit multipass und moderner Syntax
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -multipass 1pass"
   fi
 }
 
