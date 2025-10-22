@@ -275,10 +275,8 @@ run_ffmpeg_batch() {
         -map 0:v -map 0:a \
         $audio_opts "$out" >> "$LOGTMP" 2>&1 &
       FFMPEG_PID=$!
-
       tail -f "$LOGTMP" >> "$LOGFILE" &
       TAIL_PID=$!
-
       wait "$FFMPEG_PID"
       [[ "$mode" == "zenity" ]] && stop_spinner
       kill "$TAIL_PID" 2>/dev/null
@@ -368,7 +366,7 @@ run_ffmpeg_single() {
         --center --wrap --tail --no-buttons &
       local TAIL_PID=$!
       wait "$FFMPEG_PID"
-      kill "$TAIL_PID"
+      kill "$TAIL_PID" 2>/dev/null
       stop_spinner
       rm "$LOGFILE"
       zenity --info --title="✅ Done" --text="Conversion complete:\n$output"
