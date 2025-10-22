@@ -214,6 +214,31 @@ stop_spinner() {
   kill "$SPINNER_PID" 2>/dev/null
 }
 
+spinner_knight_rider() {
+  local msg="🔄 Konvertierung läuft..."
+  local width=50
+  local delay=0.1
+  local pos=0
+  local dir=1
+
+  while true; do
+    local line=""
+    for ((i=0; i<width; i++)); do
+      if (( i == pos )); then
+        line+="█"
+      else
+        line+=" "
+      fi
+    done
+    dialog --infobox "$msg\n[$line]" 6 $((width + 10))
+    sleep "$delay"
+    ((pos += dir))
+    if (( pos == width || pos == 0 )); then
+      ((dir *= -1))
+    fi
+  done
+}
+
 run_ffmpeg_batch() {
   local encoder="$1"
   local bitrate="$2"
@@ -254,17 +279,20 @@ run_ffmpeg_batch() {
 
     if [[ "$mode" == "dialog" ]]; then
       local LOGTMP=$(mktemp)
+      spinner_knight_rider &
+      SPINNER_PID=$!
       script -q -c "stdbuf -oL -eL ffmpeg -y $HWACCEL -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
         -pix_fmt '$pix_fmt' \
         -map 0:v -map 0:a \
         $audio_opts '$out'" /dev/null &> "$LOGTMP" &
       FFMPEG_PID=$!
-      tail -f "$LOGTMP" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOGTMP.wrapped" &
-      dialog --tailbox "$LOGTMP.wrapped" 25 100 &
-      TAIL_PID=$!
+      #tail -f "$LOGTMP" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOGTMP.wrapped" &
+      #dialog --tailbox "$LOGTMP.wrapped" 25 100 &
+      #TAIL_PID=$!
       wait "$FFMPEG_PID"
-      kill "$TAIL_PID" 2>/dev/null
-      rm "$LOGTMP" "$LOGTMP.wrapped"
+      #kill "$TAIL_PID" 2>/dev/null
+      kill "$SPINNER_PID" 2>/dev/null
+      rm "$LOGTMP" #"$LOGTMP.wrapped"
       [[ $? -eq 0 ]] && ((success++)) || ((fail++))
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
@@ -373,13 +401,16 @@ run_ffmpeg_single() {
       ;;
     dialog)
       local LOG=$(mktemp)
+      spinner_knight_rider &
+      SPINNER_PID=$!
       "${convert_command[@]}" &> "$LOG" &
       local FFMPEG_PID=$!
-      tail -f "$LOG" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOG.wrapped" &
-      dialog --tailbox "$LOG.wrapped" 25 100
+      #tail -f "$LOG" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOG.wrapped" &
+      #dialog --tailbox "$LOG.wrapped" 25 100
       wait "$FFMPEG_PID"
-      kill "$TAIL_PID" 2>/dev/null
-      rm "$LOG" "$LOG.wrapped"
+      #kill "$TAIL_PID" 2>/dev/null
+      kill "$SPINNER_PID" 2>/dev/null
+      rm "$LOG" #"$LOG.wrapped"
       dialog --msgbox "✅ Conversion complete:\n$output" 8 60
       ;;
     cli)
