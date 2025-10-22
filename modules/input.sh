@@ -52,6 +52,7 @@ get_gutenberg_input() {
   export URL OUTPUT TARGET_DIR
 }
 
+# Clean up unwanted lines from chapter text
 clean_chapter_text() {
   awk '
     BEGIN { skip = 0 }
@@ -65,48 +66,54 @@ clean_chapter_text() {
     sed -E 's/Shop \+{3,}//g' > "$2"
 }
 
-download_and_convert_gutenberg() {
-  local url="$1"
-  local output="$2"
-  local target_dir="$3"
-  local disable_toc="$4"
+# Main function to download, process, and generate PDF
+download_and_convert() {
+  CHAPTER_COUNT=1
+  WORKDIR=$(mktemp -d)
+  cd "$WORKDIR" || exit 1
 
-  local workdir
-  workdir=$(mktemp -d)
-  cd "$workdir" || exit 1
+  # Extract book path from URL
+  BOOK_PATH=$(echo "$URL" | sed -E 's|https?://www\.projekt-gutenberg\.org/||; s|/index\.html||')
+  wget -qO- "$URL" > raw.html
 
-  local book_path
-  book_path=$(echo "$url" | sed -E 's|https?://www\.projekt-gutenberg\.org/||; s|/index\.html||')
-  wget -qO- "$url" > raw.html
+  # Extract metadata from raw HTML
+  RAW_CLEAN=$(sed ':a;N;$!ba;s/\n/ /g' raw.html)
+  AUTHOR=$(echo "$RAW_CLEAN" | sed -n 's/.*<meta name="author"[[:space:]]*content="\([^"]*\)".*/\1/p' | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  TITLE=$(echo "$RAW_CLEAN" | sed -n 's/.*<meta name="title"[[:space:]]*content="\([^"]*\)".*/\1/p' | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  TRANSLATOR=$(echo "$RAW_CLEAN" | sed -n 's/.*<meta name="translator"[[:space:]]*content="\([^"]*\)".*/\1/p' | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  PUBLISHER=$(echo "$RAW_CLEAN" | sed -n 's/.*<meta name="publisher"[[:space:]]*content="\([^"]*\)".*/\1/p' | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-  local raw_clean
-  raw_clean=$(sed ':a;N;$!ba;s/\n/ /g' raw.html)
-  local author title translator publisher
-  author=$(echo "$raw_clean" | sed -n 's/.*<meta name="author"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
-  title=$(echo "$raw_clean" | sed -n 's/.*<meta name="title"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
-  translator=$(echo "$raw_clean" | sed -n 's/.*<meta name="translator"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
-  publisher=$(echo "$raw_clean" | sed -n 's/.*<meta name="publisher"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
+  # Show extracted metadata
+  echo "📘 Title: $TITLE"
+  echo "✍️ Author: $AUTHOR"
+  echo "🌍 Translator: $TRANSLATOR"
+  echo "🏢 Publisher: $PUBLISHER"
 
+  # Extract chapter links
   grep -oP "(?<=href=['\"])[^'\"]+\.html(?=['\"])" raw.html | sort -u > all_links.txt
   grep -E "^(titlepage\.html|chap[0-9]+\.html|kap[0-9]+\.html|text[0-9]+\.html)$" all_links.txt > links.txt
 
-  mkdir chapters && cd chapters || exit 1
+  mkdir chapters
+  cd chapters || exit 1
+
+  # Download all chapter HTML files
   while read -r link; do
-    [[ "$link" == /* ]] && wget -q "https://www.projekt-gutenberg.org$link" || wget -q "https://www.projekt-gutenberg.org/${book_path}/$link"
+    [[ "$link" == /* ]] && wget -q "https://www.projekt-gutenberg.org$link" || wget -q "https://www.projekt-gutenberg.org/${BOOK_PATH}/$link"
   done < ../links.txt
 
-  local cover_image="titel.gif"
-  local cover_url="https://www.projekt-gutenberg.org/${book_path}/bilder/${cover_image}"
-  wget -q "$cover_url" -O "$cover_image"
-  [[ ! -s "$cover_image" ]] && cover_image=""
+  # Try to download cover image
+  COVER_IMAGE="titel.gif"
+  COVER_URL="https://www.projekt-gutenberg.org/${BOOK_PATH}/bilder/${COVER_IMAGE}"
+  wget -q "$COVER_URL" -O "$COVER_IMAGE"
+  #[[ -f "$COVER_IMAGE" ]] && echo "✅ Cover image downloaded: $COVER_IMAGE" || COVER_IMAGE=""
+  if [[ -f "$COVER_IMAGE" && -s "$COVER_IMAGE" ]]; then
+    echo "✅ Cover image downloaded: $COVER_IMAGE"
+  else
+    echo "⚠️ Kein gültiges Coverbild gefunden."
+    COVER_IMAGE=""
+  fi
 
-  #echo "\\newpage" > metadata.txt
-  #echo "# $title" >> metadata.txt
-  #echo "*by $author*" >> metadata.txt
-  #echo "" >> metadata.txt
-  #[[ -n "$translator" ]] && echo "### Translated by: $TRANSLATOR" >> metadata.txt
-  #[[ -n "$publisher" ]] && echo "### Published by: $publisher" >> metadata.txt
-  #[[ -n "$cover_image" ]] && echo "![Cover]($cover_image){ width=95% }" >> metadata.txt
+  # Create metadata page
   {
     echo "\\newpage"
     echo "# $TITLE"
@@ -120,41 +127,123 @@ download_and_convert_gutenberg() {
     echo "$PUBLISHER"
     echo ""
     [[ -n "$COVER_IMAGE" ]] && echo "![Cover]($COVER_IMAGE){ width=95% }"
-  } > metadata.txt
+  } > metadata.txt  
+   
+  # Convert each chapter to clean text
+  HTML_FILES=(*.html)
+  HTML_FILES_SORTED=()
+  for f in "${HTML_FILES[@]}"; do [[ "$f" != "titlepage.html" ]] && HTML_FILES_SORTED+=("$f"); done
+  [[ -f "titlepage.html" ]] && HTML_FILES_SORTED=("titlepage.html" "${HTML_FILES_SORTED[@]}")
 
-  local chapter_count=1
-  local html_files=(*.html)
-  local sorted_files=()
-  for f in "${html_files[@]}"; do [[ "$f" != "titlepage.html" ]] && sorted_files+=("$f"); done
-  [[ -f "titlepage.html" ]] && sorted_files=("titlepage.html" "${sorted_files[@]}")
+  for file in "${HTML_FILES_SORTED[@]}"; do
+    TMP_TXT="${file%.html}.raw.txt"
+    lynx -dump "$file" > "$TMP_TXT"
+    clean_chapter_text "$TMP_TXT" "${file%.html}.clean.txt"
+  
+    if [[ "$file" == "titlepage.html" ]]; then
+      sed -E 's/^\*?[[:space:]]*//' "${file%.html}.clean.txt" |
+      sed -E 's/^\[[0-9]+\][[:space:]]*//' > "${file%.html}.pre.txt"
+      echo "\\newpage" > "${file%.html}.txt"
+      [[ -n "$COVER_IMAGE" ]] && echo "![Cover]($COVER_IMAGE)" >> "${file%.html}.txt" && echo "" >> "${file%.html}.txt"
+      cat "${file%.html}.pre.txt" >> "${file%.html}.txt"
+    else
+      sed -E 's/^\*?[[:space:]]*//' "${file%.html}.clean.txt" |
+      sed -E 's/^\[[0-9]+\][[:space:]]*//' > "${file%.html}.pre.txt"
 
-  for file in "${sorted_files[@]}"; do
-    local raw_txt="${file%.html}.raw.txt"
-    lynx -dump "$file" > "$raw_txt"
-    clean_chapter_text "$raw_txt" "${file%.html}.clean.txt"
+      # scan for Title (Bash only)
+      SPECIAL_TITLES="Schlu(ß|ss)|Fin|Epilog|Nachwort|Prolog|Ende"
+      CHAPTER_TITLE="$(
+        grep -E -m1 \
+          "^[[:space:]]*[0-9]+[[:space:]]*\.*[[:space:]]*Kapitel.*$|^[[:space:]]*[[:alpha:]ÄÖÜäöüß-]+(tes|stes)[[:space:]]+Kapitel.*$|^[[:space:]]*(${SPECIAL_TITLES})\.?$" \
+          "${file%.html}.pre.txt" \
+        | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//'
+      )"
 
-    # Titel-Erkennung und Markdown-Erzeugung wie gehabt...
-    # (Du kannst hier deine bestehende awk-Logik modularisieren)
+      [[ -z "$CHAPTER_TITLE" ]] && CHAPTER_TITLE="Kapitel $CHAPTER_COUNT"
 
-    chapter_count=$((chapter_count + 1))
+      # generate Chapter file
+      awk -v c="$CHAPTER_COUNT" -v hdr="$CHAPTER_TITLE" -v specials="$SPECIAL_TITLES" '
+      function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+      BEGIN {
+        print "\\newpage\n"
+        printf("## Chapter %d – %s\n\n", c, hdr)
+      }
+      {
+        line = $0
+        t = trim(line)
+
+        # 1) Skip the original title line (numeric, textual, special, or exact hdr), wherever it occurs
+        if (title_skipped == 0 &&
+            ( t == hdr ||
+              t ~ /^[0-9]+\.([[:space:]]*)Kapitel\b.*/ ||
+              t ~ /^[A-ZÄÖÜa-zäöüß-]+(stes|tes)[[:space:]]+Kapitel\b.*/ ||
+              (specials != "" && t ~ ("^(" specials ")\\b.*")) )) {
+          title_skipped = 1
+          expect_subtitle = 1
+          next
+        }
+
+        # 2) If the very next non-empty line looks like a subtitle, emit it as ### and skip it
+        if (expect_subtitle == 1 && t != "") {
+          # Heuristics: short line, contains a separator (–, -, :) and is not itself a title
+          is_title = ( t ~ /^[0-9]+\.([[:space:]]*)Kapitel\b.*/ ||
+                       t ~ /^[A-ZÄÖÜa-zäöüß-]+(stes|tes)[[:space:]]+Kapitel\b.*/ ||
+                       (specials != "" && t ~ ("^(" specials ")\\b.*")) )
+          if (!is_title && (length(t) <= 200) && (t ~ /[–-]|:/)) {
+            printf("### %s\n\n", t)
+            expect_subtitle = 0
+            next
+          } else {
+            # No subtitle; fall through to normal text
+            expect_subtitle = 0
+          }
+        }
+
+        # 3) Normal content
+        print line
+      }
+      ' "${file%.html}.pre.txt" > "${file%.html}.txt"
+
+      # Shell output
+      echo "📘 Kapitel erkannt: Chapter $CHAPTER_COUNT – $CHAPTER_TITLE"
+      CHAPTER_COUNT=$((CHAPTER_COUNT + 1))
+    fi
+    
+    # Remove intermediate files to keep things tidy
+    rm "$TMP_TXT" "${file%.html}.clean.txt" "${file%.html}.pre.txt"
   done
+  
+  # 📦 Merge all processed text files into one
+  echo "📦 Merging all chapters..."
+  if ! $DISABLE_TOC; then
+  # generate LaTeX-Header for Pandoc
+  {
+    echo "\\usepackage{titletoc}"
+    echo "\\setcounter{tocdepth}{2}"
+    echo "\\newcommand{\\customtoc}{"
+    echo "  \\clearpage"
+    echo "  \\tableofcontents"
+    echo "}"
+  } > custom-header.tex
 
-  local final_txt="${output}.txt"
-  if [[ "$disable_toc" == false ]]; then
-    echo "\\usepackage{titletoc}" > custom-header.tex
-    echo "\\setcounter{tocdepth}{2}" >> custom-header.tex
-    echo "\\newcommand{\\customtoc}{\\clearpage\\tableofcontents}" >> custom-header.tex
-    echo "\\customtoc" > toc_trigger.txt
-    cat metadata.txt toc_trigger.txt chap*.txt > "$final_txt"
+  # TOC-Trigger in Markdown
+  echo "\\customtoc" > toc_trigger.txt
+
+  # Merge: Cover → TOC → Capital
+    cat metadata.txt toc_trigger.txt chap*.txt > "${OUTPUT}.txt"
   else
-    cat metadata.txt chap*.txt > "$final_txt"
+    cat metadata.txt chap*.txt > "${OUTPUT}.txt"
   fi
 
-  pandoc "$final_txt" -o "${target_dir}/${output}.pdf" \
-    --pdf-engine=xelatex \
-    $( [[ "$disable_toc" == false ]] && echo "--include-in-header=custom-header.tex" )
+  # 🖨 Generate PDF in the target directory
+  echo "🖨 Generating PDF..."
+  PANDOC_OPTIONS=("--pdf-engine=xelatex")
+  ! $DISABLE_TOC && PANDOC_OPTIONS+=("--include-in-header=custom-header.tex")
 
-  cd .. && rm -rf "$workdir"
+  pandoc "${OUTPUT}.txt" -o "${TARGET_DIR}/${OUTPUT}.pdf" "${PANDOC_OPTIONS[@]}"
+
+  # Return to working directory root for cleanup
+  cd ..
 }
 
 get_ffmpeg_input() {
