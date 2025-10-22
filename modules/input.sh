@@ -192,12 +192,18 @@ stop_live_log() {
 start_spinner() {
   (
     while true; do
-      echo "# Convertion running..."
+      echo "# Convertion in progress"
+      sleep 1
+      echo "# Convertion in progress."
+      sleep 1
+      echo "# Convertion in progress.."
+      sleep 1
+      echo "# Convertion in progress..."
       sleep 1
     done
   ) | zenity --progress \
     --title="⏳ Please wait..." \
-    --text="Convertion running..." \
+    --text="Convertion in progress..." \
     --pulsate \
     --auto-close \
     --no-cancel &
