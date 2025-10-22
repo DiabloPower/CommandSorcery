@@ -379,7 +379,7 @@ select_nvenc_ratecontrol() {
     echo "-rc:v constqp -qp $quality"
   else
     # Turing oder neuer: vbr mit multipass und moderner Syntax
-    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -multipass 1pass"
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -multipass 1p"
   fi
 }
 
