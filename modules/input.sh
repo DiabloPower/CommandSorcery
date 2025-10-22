@@ -355,9 +355,7 @@ run_ffmpeg_single() {
       ;;
     cli)
       echo "🎬 Converting..."
-      #"${convert_command[@]}"
-      ffmpeg -y -i "$input" -c:v "$encoder" -rc:v vbr -cq:v "$quality" -b:v "${bitrate}M" \
-      -maxrate:v "$((bitrate + 1))M" -bufsize:v "$((bitrate * 2))M" -preset medium -pix_fmt yuv444p "$output"
+      "${convert_command[@]}"
       echo "✅ Conversion complete: $output"
       ;;
   esac
@@ -377,11 +375,11 @@ select_nvenc_ratecontrol() {
   local bitrate="$3"
 
   if $is_maxwell; then
-    # Maxwell: constqp is stabel and efficient
-    echo "-rc:v constqp -qp $quality"
+    # Maxwell: yuv420p
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -preset medium -profile:v main -tune hq -pix_fmt yuv420p"
   else
-    # Turing or newer: vbr with modern Syntax
-    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M"
+    # Turing or newer: yuv444p
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -preset medium -profile:v main -tune hq -pix_fmt yuv444p"
   fi
 }
 
