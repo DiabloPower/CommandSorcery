@@ -375,18 +375,18 @@ select_nvenc_ratecontrol() {
   local bitrate="$3"
 
   if $is_maxwell; then
-    # Maxwell: constqp ist stabil und effizient
+    # Maxwell: constqp is stabel und efficent
     echo "-rc:v constqp -qp $quality"
   else
-    # Turing oder neuer: vbr mit multipass und moderner Syntax
-    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -multipass 1p"
+    # Turing or newer: vbr with multipass and modern syntax
+    echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M -multipass '1pass'"
   fi
 }
 
 detect_hwaccel_cuda() {
-  # Prüfen, ob CUDA-Decoding verfügbar ist
+  # try, CUDA-Decoding
   if ffmpeg -hide_banner -hwaccels 2>/dev/null | grep -q "cuda"; then
-    # Optional: Testlauf mit Dummy-Input
+    # Optional: try-run with dummy data
     ffmpeg -hwaccel cuda -f lavfi -i testsrc -frames:v 1 -f null - 2>/dev/null
     if [[ $? -eq 0 ]]; then
       echo "-hwaccel cuda"
