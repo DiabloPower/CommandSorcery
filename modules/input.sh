@@ -374,6 +374,7 @@ run_ffmpeg_single() {
       tail -f "$LOG" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOG.wrapped" &
       dialog --tailbox "$LOG.wrapped" 25 100
       wait "$FFMPEG_PID"
+      kill "$TAIL_PID" 2>/dev/null
       rm "$LOG" "$LOG.wrapped"
       dialog --msgbox "✅ Conversion complete:\n$output" 8 60
       ;;
