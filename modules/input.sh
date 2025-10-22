@@ -67,7 +67,7 @@ clean_chapter_text() {
 }
 
 # Main function to download, process, and generate PDF
-download_and_convert() {
+download_and_convert_gutenberg() {
   CHAPTER_COUNT=1
   WORKDIR=$(mktemp -d)
   cd "$WORKDIR" || exit 1
