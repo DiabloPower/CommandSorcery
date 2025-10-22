@@ -229,7 +229,7 @@ run_ffmpeg_batch() {
 
     if [[ "$mode" == "dialog" ]]; then
       dialog --programbox "🎬 Konvertiere: $base → $(basename "$out")" 25 100 < <(
-        script -q -c "stdbuf -oL -eL ffmpeg -y -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
+        script -q -c "stdbuf -oL -eL ffmpeg -y $HWACCEL -i '$f' -c:v '$encoder' $ratecontrol -preset medium \
           -pix_fmt "$pix_fmt" \
           -b:v '${bitrate}M' -qp '$quality' -map 0:v -map 0:a \
           $audio_opts '$out'" /dev/null
@@ -238,7 +238,7 @@ run_ffmpeg_batch() {
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
       local LOGTMP=$(mktemp)
-      stdbuf -oL -eL ffmpeg -y -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
+      stdbuf -oL -eL ffmpeg -y $HWACCEL -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
         -pix_fmt "$pix_fmt" \
         -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
         $audio_opts "$out" >> "$LOGTMP" 2>&1 &
@@ -299,7 +299,7 @@ run_ffmpeg_single() {
   fi
 
   local convert_command=(
-    ffmpeg -y -i "$input" -c:v "$encoder" $ratecontrol -preset medium \
+    ffmpeg -y $HWACCEL -i "$input" -c:v "$encoder" $ratecontrol -preset medium \
     -pix_fmt "$pix_fmt" \
     -b:v "${bitrate}M" -qp "$quality" -map 0:v -map 0:a \
     $audio_opts "$output"
@@ -379,4 +379,17 @@ select_nvenc_ratecontrol() {
   else
     echo "-rc:v vbr_hq -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M"
   fi
+}
+
+detect_hwaccel_cuda() {
+  # Prüfen, ob CUDA-Decoding verfügbar ist
+  if ffmpeg -hide_banner -hwaccels 2>/dev/null | grep -q "cuda"; then
+    # Optional: Testlauf mit Dummy-Input
+    ffmpeg -hwaccel cuda -f lavfi -i testsrc -frames:v 1 -f null - 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+      echo "-hwaccel cuda"
+      return
+    fi
+  fi
+  echo ""
 }
