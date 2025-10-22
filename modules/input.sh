@@ -356,7 +356,7 @@ run_ffmpeg_single() {
     cli)
       echo "🎬 Converting..."
       #"${convert_command[@]}"
-      ffmpeg -y -hwaccel cuda -i "$input" -c:v "$encoder" -rc:v vbr -cq:v "$quality" -b:v "${bitrate}M" \
+      ffmpeg -y -i "$input" -c:v "$encoder" -rc:v vbr -cq:v "$quality" -b:v "${bitrate}M" \
       -maxrate:v "$((bitrate + 1))M" -bufsize:v "$((bitrate * 2))M" -preset medium -pix_fmt yuv444p "$output"
       echo "✅ Conversion complete: $output"
       ;;
