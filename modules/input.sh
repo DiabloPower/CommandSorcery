@@ -130,6 +130,19 @@ download_and_convert_gutenberg() {
   cd .. && rm -rf "$workdir"
 }
 
+clean_chapter_text() {
+  awk '
+    BEGIN { skip = 0 }
+    /(___|<< zurück)/ { skip = 1; next }
+    /\+\+\+/ { if (skip) { skip = 0; next } }
+    skip == 0 { print }
+  ' "$1" |
+    sed '/Projekt Gutenberg-DE/d;/Zurück/d;/Weiter/d;/Impressum/d;/Datenschutz/d;/Lesetipps/d;/Nach oben/d;/Kapitelübersicht/d;/∞/d' |
+    grep -v 'file:///' |
+    sed '/^Seite [0-9]\+$/d;/^[0-9]\{1,3\}$/d;/^[[:punct:]]\+$/d;/^ *$/d' |
+    sed -E 's/Shop \+{3,}//g' > "$2"
+}
+
 get_ffmpeg_input() {
   local mode="$1"
   BITRATE="2"
