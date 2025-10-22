@@ -253,11 +253,12 @@ run_ffmpeg_batch() {
         -map 0:v -map 0:a \
         $audio_opts '$out'" /dev/null &> "$LOGTMP" &
       FFMPEG_PID=$!
-      dialog --tailbox "$LOGTMP" 25 100 &
+      tail -f "$LOGTMP" | fold -s -w 100 > "$LOGTMP.wrapped" &
+      dialog --tailbox "$LOGTMP.wrapped" 25 100 &
       TAIL_PID=$!
       wait "$FFMPEG_PID"
       kill "$TAIL_PID" 2>/dev/null
-      rm "$LOGTMP"
+      rm "$LOGTMP" "$LOGTMP.wrapped"
       [[ $? -eq 0 ]] && ((success++)) || ((fail++))
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
