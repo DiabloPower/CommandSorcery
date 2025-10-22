@@ -253,7 +253,7 @@ run_ffmpeg_batch() {
         -map 0:v -map 0:a \
         $audio_opts '$out'" /dev/null &> "$LOGTMP" &
       FFMPEG_PID=$!
-      tail -f "$LOGTMP" | fold -s -w 100 > "$LOGTMP.wrapped" &
+      tail -f "$LOGTMP" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOGTMP.wrapped" &
       dialog --tailbox "$LOGTMP.wrapped" 25 100 &
       TAIL_PID=$!
       wait "$FFMPEG_PID"
@@ -371,9 +371,10 @@ run_ffmpeg_single() {
       local LOG=$(mktemp)
       "${convert_command[@]}" &> "$LOG" &
       local FFMPEG_PID=$!
-      dialog --tailbox "$LOG" 25 100
+      tail -f "$LOG" | awk '{ while (length($0) > 100) { print substr($0, 1, 100); $0 = substr($0, 101); } print }' > "$LOG.wrapped" &
+      dialog --tailbox "$LOG.wrapped" 25 100
       wait "$FFMPEG_PID"
-      rm "$LOG"
+      rm "$LOG" "$LOG.wrapped"
       dialog --msgbox "✅ Conversion complete:\n$output" 8 60
       ;;
     cli)
