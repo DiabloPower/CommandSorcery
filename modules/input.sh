@@ -262,7 +262,7 @@ run_ffmpeg_batch() {
     else
       echo "🎬 Konvertiere: $base → $(basename "$out")" >> "$LOGFILE"
       local LOGTMP=$(mktemp)
-      [[ "$mode" == "zenity"]] && start_spinner
+      [[ "$mode" == "zenity" ]] && start_spinner
       stdbuf -oL -eL ffmpeg -y $HWACCEL -i "$f" -c:v "$encoder" $ratecontrol -preset medium \
         -pix_fmt "$pix_fmt" \
         -map 0:v -map 0:a \
@@ -273,7 +273,7 @@ run_ffmpeg_batch() {
       TAIL_PID=$!
 
       wait "$FFMPEG_PID"
-      [[ "$mode" == "zenity"]] && stop_spinner
+      [[ "$mode" == "zenity" ]] && stop_spinner
       kill "$TAIL_PID" 2>/dev/null
       rm "$LOGTMP"
 
