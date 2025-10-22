@@ -375,10 +375,10 @@ select_nvenc_ratecontrol() {
   local bitrate="$3"
 
   if $is_maxwell; then
-    # Maxwell: constqp is stabel und efficent
+    # Maxwell: constqp is stabel and efficient
     echo "-rc:v constqp -qp $quality"
   else
-    # Turing or newer: vbr with multipass and modern syntax
+    # Turing or newer: vbr with modern Syntax
     echo "-rc:v vbr -cq:v $quality -b:v ${bitrate}M -maxrate:v $((bitrate + 1))M -bufsize:v $((bitrate * 2))M"
   fi
 }
