@@ -52,6 +52,84 @@ get_gutenberg_input() {
   export URL OUTPUT TARGET_DIR
 }
 
+download_and_convert_gutenberg() {
+  local url="$1"
+  local output="$2"
+  local target_dir="$3"
+  local disable_toc="$4"
+
+  local workdir
+  workdir=$(mktemp -d)
+  cd "$workdir" || exit 1
+
+  local book_path
+  book_path=$(echo "$url" | sed -E 's|https?://www\.projekt-gutenberg\.org/||; s|/index\.html||')
+  wget -qO- "$url" > raw.html
+
+  local raw_clean
+  raw_clean=$(sed ':a;N;$!ba;s/\n/ /g' raw.html)
+  local author title translator publisher
+  author=$(echo "$raw_clean" | sed -n 's/.*<meta name="author"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
+  title=$(echo "$raw_clean" | sed -n 's/.*<meta name="title"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
+  translator=$(echo "$raw_clean" | sed -n 's/.*<meta name="translator"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
+  publisher=$(echo "$raw_clean" | sed -n 's/.*<meta name="publisher"[[:space:]]*content="\([^"]*\)".*/\1/p' | xargs)
+
+  grep -oP "(?<=href=['\"])[^'\"]+\.html(?=['\"])" raw.html | sort -u > all_links.txt
+  grep -E "^(titlepage\.html|chap[0-9]+\.html|kap[0-9]+\.html|text[0-9]+\.html)$" all_links.txt > links.txt
+
+  mkdir chapters && cd chapters || exit 1
+  while read -r link; do
+    [[ "$link" == /* ]] && wget -q "https://www.projekt-gutenberg.org$link" || wget -q "https://www.projekt-gutenberg.org/${book_path}/$link"
+  done < ../links.txt
+
+  local cover_image="titel.gif"
+  local cover_url="https://www.projekt-gutenberg.org/${book_path}/bilder/${cover_image}"
+  wget -q "$cover_url" -O "$cover_image"
+  [[ ! -s "$cover_image" ]] && cover_image=""
+
+  echo "\\newpage" > metadata.txt
+  echo "# $title" >> metadata.txt
+  echo "*by $author*" >> metadata.txt
+  echo "" >> metadata.txt
+  [[ -n "$translator" ]] && echo "### Translated by\n$translator" >> metadata.txt
+  [[ -n "$publisher" ]] && echo "### Published by\n$publisher" >> metadata.txt
+  [[ -n "$cover_image" ]] && echo "![Cover]($cover_image){ width=95% }" >> metadata.txt
+
+  local chapter_count=1
+  local html_files=(*.html)
+  local sorted_files=()
+  for f in "${html_files[@]}"; do [[ "$f" != "titlepage.html" ]] && sorted_files+=("$f"); done
+  [[ -f "titlepage.html" ]] && sorted_files=("titlepage.html" "${sorted_files[@]}")
+
+  for file in "${sorted_files[@]}"; do
+    local raw_txt="${file%.html}.raw.txt"
+    lynx -dump "$file" > "$raw_txt"
+    clean_chapter_text "$raw_txt" "${file%.html}.clean.txt"
+
+    # Titel-Erkennung und Markdown-Erzeugung wie gehabt...
+    # (Du kannst hier deine bestehende awk-Logik modularisieren)
+
+    chapter_count=$((chapter_count + 1))
+  done
+
+  local final_txt="${output}.txt"
+  if [[ "$disable_toc" == false ]]; then
+    echo "\\usepackage{titletoc}" > custom-header.tex
+    echo "\\setcounter{tocdepth}{2}" >> custom-header.tex
+    echo "\\newcommand{\\customtoc}{\\clearpage\\tableofcontents}" >> custom-header.tex
+    echo "\\customtoc" > toc_trigger.txt
+    cat metadata.txt toc_trigger.txt chap*.txt > "$final_txt"
+  else
+    cat metadata.txt chap*.txt > "$final_txt"
+  fi
+
+  pandoc "$final_txt" -o "${target_dir}/${output}.pdf" \
+    --pdf-engine=xelatex \
+    $( [[ "$disable_toc" == false ]] && echo "--include-in-header=custom-header.tex" )
+
+  cd .. && rm -rf "$workdir"
+}
+
 get_ffmpeg_input() {
   local mode="$1"
   BITRATE="2"
