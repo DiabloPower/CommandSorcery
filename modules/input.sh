@@ -55,7 +55,7 @@ get_gutenberg_input() {
 get_ffmpeg_input() {
   local mode="$1"
   BITRATE="2"
-  QUALITY="22"
+  QUALITY="28"
   case "$mode" in
     yad)
       FORM=$(yad --form --title="🎥 MKV Converter" \
@@ -168,7 +168,7 @@ start_live_log() {
     yad)
       tail -f "$logfile" | yad --text-info \
         --title="🎬 Batch Converting..." \
-        --width=800 --height=400 \
+        --width=900 --height=500 \
         --center --wrap --tail --no-buttons &
       ;;
     zenity)
