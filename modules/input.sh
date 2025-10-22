@@ -192,12 +192,12 @@ stop_live_log() {
 start_spinner() {
   (
     while true; do
-      echo "# Konvertierung läuft..."
+      echo "# Convertion running..."
       sleep 1
     done
   ) | zenity --progress \
-    --title="⏳ Bitte warten..." \
-    --text="Konvertierung läuft..." \
+    --title="⏳ Please wait..." \
+    --text="Convertion running..." \
     --pulsate \
     --auto-close \
     --no-cancel &
@@ -219,7 +219,7 @@ run_ffmpeg_batch() {
   local ratecontrol="$8"
   local audio_opts="$9"
 
-  echo "📦 Starte Batch-Konvertierung..."
+  echo "📦 starting Batch convertion..."
   shopt -s nullglob
   local formats=(mp4 mkv avi mov flv webm mpeg mpg m4v ts wmv ogg)
   local files=()
@@ -242,7 +242,7 @@ run_ffmpeg_batch() {
 
     if [[ "$(realpath "$f")" == "$(realpath "$out")" ]]; then
       ((skipped++))
-      [[ "$mode" != "dialog" ]] && echo "⚠️ Überspringe (gleiches Ziel): $base" >> "$LOGFILE"
+      [[ "$mode" != "dialog" ]] && echo "⚠️ skipping (same output): $base" >> "$LOGFILE"
       continue
     fi
 
@@ -287,24 +287,24 @@ run_ffmpeg_batch() {
   case "$mode" in
     yad)
       yad --info \
-        --title="✅ Batch abgeschlossen" \
-        --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" \
+        --title="✅ Batch convertion complete" \
+        --text="✔️ successful: $success\n❌ failed: $fail\n⚠️ skipped: $skipped" \
         --button="OK:0" --width=400 --height=120
       ;;
     zenity)
       zenity --info \
-        --title="✅ Zusammenfassung" \
-        --text="✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped"
+        --title="✅ Summary" \
+        --text="✔️ successful: $success\n❌ failed: $fail\n⚠️ skipped: $skipped"
       ;;
     dialog)
-      dialog --msgbox "✅ Batch abgeschlossen:\n✔️ Erfolgreich: $success\n❌ Fehlgeschlagen: $fail\n⚠️ Übersprungen: $skipped" 10 60
+      dialog --msgbox "✅ Batch convertion complete:\n✔️ successful: $success\n❌ failed: $fail\n⚠️ skipped: $skipped" 10 60
       ;;
     cli)
       echo ""
-      echo "📊 Zusammenfassung:"
-      echo "✔️ Erfolgreich: $success"
-      echo "❌ Fehlgeschlagen: $fail"
-      echo "⚠️ Übersprungen: $skipped"
+      echo "📊 Summary:"
+      echo "✔️ successful: $success"
+      echo "❌ failed:     $fail"
+      echo "⚠️ skipped:    $skipped"
       ;;
   esac
 }
