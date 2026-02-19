@@ -477,6 +477,10 @@ run_ffmpeg_batch() {
   local ratecontrol="$8"
   local audio_opts="$9"
 
+  pix_fmt="${pix_fmt:-yuv420p}"
+  ratecontrol="-rc:v vbr -qp $quality -b:v ${bitrate}M -maxrate:v $((bitrate+1))M -bufsize:v $((bitrate*4))M"
+  audio_opts="-c:a aac -b:a 192k"
+
   echo "📦 starting Batch convertion..."
   shopt -s nullglob
   local formats=(mp4 mkv avi mov flv webm mpeg mpg m4v ts wmv ogg)
@@ -574,6 +578,10 @@ run_ffmpeg_single() {
   local pix_fmt="$7"
   local ratecontrol="$8"
   local audio_opts="$9"
+
+  pix_fmt="${pix_fmt:-yuv420p}"
+  ratecontrol="-rc:v vbr -qp $quality -b:v ${bitrate}M -maxrate:v $((bitrate+1))M -bufsize:v $((bitrate*4))M"
+  audio_opts="-c:a aac -b:a 192k"
 
   if [[ "$(realpath "$input")" == "$(realpath "$output")" ]]; then
     echo "❌ Input and output file are the same. Aborting."
